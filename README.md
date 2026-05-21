@@ -327,7 +327,7 @@ Contributions are warmly welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md)
 ## Author
 
 **Bonheur Mahoro**  
-[bonheur.mahoro@amalitechtraining.org](mailto:bonheur.mahoro@amalitechtraining.org)  
+[mahorobonheur123@gmail.com](mailto:bonheur.mahoro@amalitechtraining.org)  
 [github.com/mahorobonheur](https://github.com/mahorobonheur)
 
 ---
