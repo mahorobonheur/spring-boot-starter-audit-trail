@@ -137,6 +137,20 @@
 
     </dependencies>
 
+    <!-- Distribution management -->
+    <distributionManagement>
+        <!-- GitHub Packages (used by default deploy; CI publishes snapshots here) -->
+        <snapshotRepository>
+            <id>github</id>
+            <url>https://maven.pkg.github.com/mahorobonheur/spring-boot-starter-audit-trail</url>
+        </snapshotRepository>
+        <!-- Maven Central Portal (used only with -P release) -->
+        <repository>
+            <id>central</id>
+            <url>https://central.sonatype.com/api/v1/publisher</url>
+        </repository>
+    </distributionManagement>
+
     <!-- Build plugins -->
     <build>
         <plugins>
@@ -216,5 +230,57 @@
 
         </plugins>
     </build>
+
+
+    <!-- Release profile: GPG signing + Maven Central publishing -->
+    <profiles>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+
+                    <!-- GPG signing — required by Maven Central -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.2.4</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                                <configuration>
+                                    <!-- Passphrase is read from env MAVEN_GPG_PASSPHRASE -->
+                                    <gpgArguments>
+                                        <arg>--pinentry-mode</arg>
+                                        <arg>loopback</arg>
+                                    </gpgArguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <!-- Maven Central Portal publisher (new, replaces nexus-staging) -->
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.5.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <!-- Matches server-id configured in settings.xml by actions/setup-java -->
+                            <publishingServerId>central</publishingServerId>
+                            <tokenAuth>true</tokenAuth>
+                            <autoPublish>true</autoPublish>
+                            <waitUntil>published</waitUntil>
+                            <deploymentName>spring-boot-starter-audit-trail</deploymentName>
+                        </configuration>
+                    </plugin>
+
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

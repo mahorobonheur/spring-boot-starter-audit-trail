@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+# Minimal permissions; individual jobs override as needed.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── 1. Build & test on every supported Java version ───────────────────────
+  build:
+    name: Build & Test — Java ${{ matrix.java }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write          # for test-reporter
+      pull-requests: write   # for JaCoCo PR comment
+
+    strategy:
+      fail-fast: false
+      matrix:
+        java: [ '17', '21' ]
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0    # full history needed for SonarCloud (if added later)
+
+      - name: Set up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java }}
+          distribution: temurin
+          cache: maven
+
+      - name: Build, test & verify
+        run: mvn clean verify --batch-mode --no-transfer-progress -e
+
+      # ── Publish test results as a check (Java 17 only to avoid duplicates)
+      - name: Publish JUnit test report
+        if: always() && matrix.java == '17'
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: target/surefire-reports/TEST-*.xml
+          check_name: JUnit Test Report
+          fail_on_failure: true
+          require_tests: true
+
+      # ── Upload JaCoCo HTML report for manual inspection
+      - name: Upload JaCoCo HTML report
+        if: always() && matrix.java == '17'
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-html-report
+          path: target/site/jacoco/
+          retention-days: 14
+
+      # ── Upload JaCoCo XML for the coverage-gate job
+      - name: Upload JaCoCo XML
+        if: matrix.java == '17'
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-xml
+          path: target/site/jacoco/jacoco.xml
+          retention-days: 1
+
+      # ── Upload Surefire XML reports for auditing
+      - name: Upload Surefire reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-java-${{ matrix.java }}
+          path: target/surefire-reports/
+          retention-days: 7
+
+  # ── 2. Coverage gate + PR annotation ──────────────────────────────────────
+  coverage:
+    name: Coverage Gate
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Download JaCoCo XML
+        uses: actions/download-artifact@v4
+        with:
+          name: jacoco-xml
+          path: target/site/jacoco/
+
+      - name: Post coverage comment on PR
+        if: github.event_name == 'pull_request'
+        uses: madrapps/jacoco-report@v1.6.1
+        with:
+          paths: ${{ github.workspace }}/target/site/jacoco/jacoco.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
+          min-coverage-overall: 80
+          min-coverage-changed-files: 75
+          title: "## Code Coverage"
+          update-comment: true
+          pass-emoji: ✅
+          fail-emoji: ❌
+
+  # ── 3. Validate pom.xml and Maven metadata ────────────────────────────────
+  validate:
+    name: Maven Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+      - name: Validate POM
+        run: mvn validate --batch-mode --no-transfer-progress
+      - name: Check dependency updates (informational)
+        run: |
+          mvn versions:display-dependency-updates \
+            --batch-mode --no-transfer-progress \
+            -DprocessDependencyManagement=false \
+            || true   # non-blocking; just for visibility in logs

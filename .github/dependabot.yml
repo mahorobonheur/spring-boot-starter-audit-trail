@@ -1,0 +1,54 @@
+version: 2
+
+updates:
+  # ── Maven dependencies ─────────────────────────────────────────────────────
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Africa/Kigali
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+      - java
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      spring-boot:
+        patterns:
+          - "org.springframework.boot:*"
+          - "org.springframework:*"
+          - "org.springframework.security:*"
+          - "org.springframework.data:*"
+      jackson:
+        patterns:
+          - "com.fasterxml.jackson*:*"
+      testing:
+        patterns:
+          - "org.junit*:*"
+          - "org.assertj:*"
+          - "org.mockito:*"
+          - "org.awaitility:*"
+          - "com.h2database:*"
+      build-plugins:
+        patterns:
+          - "org.apache.maven.plugins:*"
+          - "org.jacoco:*"
+          - "org.sonatype.central:*"
+
+  # ── GitHub Actions ──────────────────────────────────────────────────────────
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Africa/Kigali
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: "chore(ci)"
