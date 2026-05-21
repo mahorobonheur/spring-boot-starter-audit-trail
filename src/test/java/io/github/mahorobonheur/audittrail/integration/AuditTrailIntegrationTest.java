@@ -1,17 +1,15 @@
 package io.github.mahorobonheur.audittrail.integration;
 
+import io.github.mahorobonheur.audittrail.AuditTrailTestApp;
 import io.github.mahorobonheur.audittrail.model.AuditAction;
 import io.github.mahorobonheur.audittrail.model.AuditLog;
 import io.github.mahorobonheur.audittrail.repository.AuditLogRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
@@ -26,29 +24,16 @@ import static org.awaitility.Awaitility.await;
  * entity save → JPA EntityListener → audit log written to H2 database.
  *
  * <p>Uses H2 in-memory database configured via {@code application-test.properties}.
+ * The Spring context is provided by {@link AuditTrailTestApp}, whose root package
+ * covers all entity, repository, and configuration sub-packages — no
+ * {@code @EntityScan} or {@code @EnableJpaRepositories} required.
  *
  * @author Bonheur Mahoro
  */
-@SpringBootTest(classes = AuditTrailIntegrationTest.TestApp.class)
+@SpringBootTest(classes = AuditTrailTestApp.class)
 @ActiveProfiles("test")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class AuditTrailIntegrationTest {
-
-    /**
-     * Minimal Spring Boot application context for the integration tests.
-     * Scans the {@code integration} package for both entities and repositories
-     * so Spring Data can proxy {@link TestUserRepository} correctly.
-     */
-    @SpringBootApplication
-    @EnableJpaRepositories(basePackages = {
-            "io.github.mahorobonheur.audittrail.repository",
-            "io.github.mahorobonheur.audittrail.integration"
-    })
-    @EntityScan(basePackages = {
-            "io.github.mahorobonheur.audittrail.model",
-            "io.github.mahorobonheur.audittrail.integration"
-    })
-    static class TestApp { }
 
     // ── Injected beans ───────────────────────────────────────────────────────
 

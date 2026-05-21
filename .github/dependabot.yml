@@ -15,6 +15,13 @@ updates:
       - java
     commit-message:
       prefix: "chore(deps)"
+    # Spring Boot minor/major version bumps require manual migration testing.
+    # Dependabot should only propose patch-level updates for the parent POM.
+    ignore:
+      - dependency-name: "org.springframework.boot:spring-boot-starter-parent"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-major"
     groups:
       spring-boot:
         patterns:
