@@ -48,7 +48,7 @@ jobs:
       # ── Publish test results as a check (Java 17 only to avoid duplicates)
       - name: Publish JUnit test report
         if: always() && matrix.java == '17'
-        uses: mikepenz/action-junit-report@v4
+        uses: mikepenz/action-junit-report@v6
         with:
           report_paths: target/surefire-reports/TEST-*.xml
           check_name: JUnit Test Report
