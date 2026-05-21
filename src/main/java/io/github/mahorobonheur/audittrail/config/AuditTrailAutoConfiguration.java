@@ -5,6 +5,7 @@ import io.github.mahorobonheur.audittrail.engine.FieldDiffEngine;
 import io.github.mahorobonheur.audittrail.listener.AuditTrailEntityListener;
 import io.github.mahorobonheur.audittrail.repository.AuditLogRepository;
 import io.github.mahorobonheur.audittrail.security.AuditSecurityResolver;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.mahorobonheur.audittrail.writer.AuditLogWriter;
 import io.github.mahorobonheur.audittrail.writer.DatabaseAuditLogWriter;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -83,13 +84,22 @@ public class AuditTrailAutoConfiguration {
     }
 
     /**
+     * Jackson 2 {@link ObjectMapper} for serialising field diffs. Spring Boot 4 defaults
+     * to Jackson 3 ({@code JsonMapper}) and does not register this bean automatically.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public ObjectMapper auditTrailObjectMapper() {
+        return new ObjectMapper();
+    }
+
+    /**
      * Default write strategy: persists audit events to the relational database.
      * Override by providing your own {@link AuditLogWriter} bean.
      */
     @Bean
     @ConditionalOnMissingBean(AuditLogWriter.class)
-    public AuditLogWriter auditLogWriter(AuditLogRepository repository,
-                                         com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
+    public AuditLogWriter auditLogWriter(AuditLogRepository repository, ObjectMapper objectMapper) {
         return new DatabaseAuditLogWriter(repository, objectMapper);
     }
 
