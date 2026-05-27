@@ -3,6 +3,7 @@ package io.github.mahorobonheur.audittrail.engine;
 import io.github.mahorobonheur.audittrail.annotation.AuditExclude;
 import io.github.mahorobonheur.audittrail.annotation.AuditTrail;
 import io.github.mahorobonheur.audittrail.model.FieldDiff;
+import org.hibernate.Hibernate;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -46,7 +47,7 @@ public class FieldDiffEngine {
         }
 
         Object reference = (newEntity != null) ? newEntity : oldEntity;
-        Class<?> entityClass = reference.getClass();
+        Class<?> entityClass = Hibernate.getClass(reference);
 
         AuditTrail annotation = entityClass.getAnnotation(AuditTrail.class);
         Set<String> excludedByAnnotation = (annotation != null)

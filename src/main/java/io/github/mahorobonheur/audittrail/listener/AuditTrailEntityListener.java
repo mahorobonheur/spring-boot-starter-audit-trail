@@ -11,6 +11,7 @@ import jakarta.persistence.PostLoad;
 import jakarta.persistence.PreRemove;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.PrePersist;
+import org.hibernate.Hibernate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,7 +24,9 @@ import java.util.Map;
  * JPA {@code EntityListener} that intercepts entity lifecycle events for
  * entities annotated with {@link AuditTrail}.
  *
- * <p>This listener is registered automatically by the auto-configuration.
+ * <p>This listener is registered globally via {@link io.github.mahorobonheur.audittrail.config.AuditTrailHibernateIntegrator}.
+ * Delete audit events require a managed entity removal ({@code EntityManager.remove}) — bulk
+ * {@code deleteById} calls do not trigger these callbacks.
  * It hooks into the standard JPA lifecycle callbacks:
  * <ul>
  *   <li>{@link PrePersist} — captures CREATE events</li>
@@ -121,7 +124,9 @@ public class AuditTrailEntityListener {
     public void onPreRemove(Object entity) {
         if (!isAudited(entity)) return;
         try {
-            List<FieldDiff> diffs = diffEngine().diff(entity, null);
+            Object snapshot = PRE_UPDATE_SNAPSHOTS.remove(System.identityHashCode(entity));
+            Object oldState = snapshot != null ? snapshot : entity;
+            List<FieldDiff> diffs = diffEngine().diff(oldState, null);
             write(entity, AuditAction.DELETE, diffs);
         } catch (Exception e) {
             log.warn("Audit trail failed for DELETE on {}: {}", entityName(entity), e.getMessage(), e);
@@ -131,18 +136,20 @@ public class AuditTrailEntityListener {
     // Helpers
 
     private boolean isAudited(Object entity) {
-        return entity != null && entity.getClass().isAnnotationPresent(AuditTrail.class);
+        return entity != null
+                && Hibernate.getClass(entity).isAnnotationPresent(AuditTrail.class);
     }
 
     private String entityName(Object entity) {
-        return entity.getClass().getSimpleName();
+        return Hibernate.getClass(entity).getSimpleName();
     }
 
     private String entityId(Object entity) {
         // Try common ID field names; return the identity hash code as fallback.
+        Class<?> entityClass = Hibernate.getClass(entity);
         for (String idField : new String[]{"id", "ID", "Id"}) {
             try {
-                var field = findField(entity.getClass(), idField);
+                var field = findField(entityClass, idField);
                 if (field != null) {
                     field.setAccessible(true);
                     Object val = field.get(entity);
@@ -178,7 +185,7 @@ public class AuditTrailEntityListener {
      * relationship loads.
      */
     private Object cloneShallow(Object entity) throws Exception {
-        Class<?> clazz = entity.getClass();
+        Class<?> clazz = Hibernate.getClass(entity);
         Constructor<?> constructor = clazz.getDeclaredConstructor();
         constructor.setAccessible(true);                      // handles protected/package-private constructors
         Object clone = constructor.newInstance();

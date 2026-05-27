@@ -8,8 +8,6 @@ import io.github.mahorobonheur.audittrail.model.FieldDiff;
 import io.github.mahorobonheur.audittrail.repository.AuditLogRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Async;
-
 import java.time.Instant;
 import java.util.List;
 
@@ -17,10 +15,8 @@ import java.util.List;
  * Default {@link AuditLogWriter} implementation that persists audit events
  * to the relational database via {@link AuditLogRepository}.
  *
- * <p>Each write operation is executed asynchronously (via {@code @Async}) so
- * that audit logging does not block or slow down the originating transaction.
- * Ensure your application has {@code @EnableAsync} in its configuration —
- * this starter enables it automatically via {@link io.github.mahorobonheur.audittrail.config.AuditTrailAutoConfiguration}.
+ * <p>Writes are synchronous. When {@code audit-trail.async=true} (the default),
+ * {@link AsyncAuditLogWriter} delegates to this class on a background thread.
  *
  * <p>Field diffs are serialised to JSON using Jackson before storage.
  *
@@ -42,10 +38,8 @@ public class DatabaseAuditLogWriter implements AuditLogWriter {
      * {@inheritDoc}
      *
      * <p>Serialises {@code diffs} to a JSON string and persists the resulting
-     * {@link AuditLog} entity. The method is non-blocking — it runs in the
-     * Spring {@code taskExecutor} thread pool.
+     * {@link AuditLog} entity.
      */
-    @Async
     @Override
     public void write(String entityName,
                       String entityId,

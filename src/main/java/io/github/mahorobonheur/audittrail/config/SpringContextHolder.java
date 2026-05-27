@@ -3,8 +3,6 @@ package io.github.mahorobonheur.audittrail.config;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
-import org.springframework.stereotype.Component;
-
 /**
  * Static holder for the Spring {@link ApplicationContext}.
  *
@@ -15,7 +13,6 @@ import org.springframework.stereotype.Component;
  *
  * @author Bonheur Mahoro
  */
-@Component
 public class SpringContextHolder implements ApplicationContextAware {
 
     private static ApplicationContext context;

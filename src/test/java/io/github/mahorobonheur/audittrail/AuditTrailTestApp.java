@@ -1,6 +1,8 @@
 package io.github.mahorobonheur.audittrail;
 
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.persistence.autoconfigure.EntityScan;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 /**
  * Minimal Spring Boot application used exclusively by integration tests.
@@ -15,12 +17,13 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  *       {@code AutoConfiguration.imports} file</li>
  * </ul>
  *
- * <p>This avoids {@code @EntityScan} and {@code @EnableJpaRepositories} and their
- * direct dependency on {@code spring-boot-autoconfigure} internals, making the
- * test setup stable across Spring Boot minor versions.
+ * <p>Scans test entities and repositories; {@code AuditLog} is registered by the starter's
+ * {@code @EntityScan} / {@code @EnableJpaRepositories} in {@code AuditTrailAutoConfiguration}.
  *
  * @author Bonheur Mahoro
  */
 @SpringBootApplication
+@EntityScan(basePackages = "io.github.mahorobonheur.audittrail.integration")
+@EnableJpaRepositories(basePackages = "io.github.mahorobonheur.audittrail.integration")
 public class AuditTrailTestApp {
 }

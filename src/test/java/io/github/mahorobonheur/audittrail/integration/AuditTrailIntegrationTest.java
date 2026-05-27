@@ -13,6 +13,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.concurrent.TimeUnit;
 
@@ -39,6 +40,7 @@ class AuditTrailIntegrationTest {
 
     @Autowired TestUserRepository userRepo;
     @Autowired AuditLogRepository auditRepo;
+    @Autowired TransactionTemplate transactionTemplate;
 
     // ── Tests ────────────────────────────────────────────────────────────────
 
@@ -84,12 +86,28 @@ class AuditTrailIntegrationTest {
     }
 
     @Test
+    @DisplayName("CREATE event without authentication records changed_by as anonymous")
+    void createEntity_withoutAuth_recordsAnonymous() {
+        userRepo.save(new TestUser("dave", "dave@x.com", "secret", "USER"));
+
+        await().atMost(3, TimeUnit.SECONDS).untilAsserted(() -> {
+            Page<AuditLog> logs = auditRepo.findByEntityName("TestUser", PageRequest.of(0, 20));
+            assertThat(logs.getContent()).anyMatch(l -> l.getAction() == AuditAction.CREATE
+                    && l.getChangedBy().equals("anonymous"));
+        });
+    }
+
+    @Test
     @WithMockUser(username = "bonheur")
     @DisplayName("DELETE event: audit log entry is written when entity is removed")
     void deleteEntity_auditLogCreated() {
-        TestUser user = userRepo.save(new TestUser("carol", "carol@x.com", "pass", "USER"));
-        userRepo.delete(user);
-        userRepo.flush();
+        Long id = userRepo.saveAndFlush(new TestUser("carol", "carol@x.com", "pass", "USER")).id;
+
+        transactionTemplate.executeWithoutResult(status -> {
+            TestUser managed = userRepo.findById(id).orElseThrow();
+            userRepo.delete(managed);
+            userRepo.flush();
+        });
 
         await().atMost(3, TimeUnit.SECONDS).untilAsserted(() -> {
             Page<AuditLog> logs = auditRepo.findByEntityName("TestUser", PageRequest.of(0, 20));

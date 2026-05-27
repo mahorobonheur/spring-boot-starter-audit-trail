@@ -1,18 +1,24 @@
 package io.github.mahorobonheur.audittrail.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.mahorobonheur.audittrail.controller.AuditTrailController;
 import io.github.mahorobonheur.audittrail.engine.FieldDiffEngine;
 import io.github.mahorobonheur.audittrail.listener.AuditTrailEntityListener;
+import io.github.mahorobonheur.audittrail.model.AuditLog;
 import io.github.mahorobonheur.audittrail.repository.AuditLogRepository;
 import io.github.mahorobonheur.audittrail.security.AuditSecurityResolver;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.mahorobonheur.audittrail.writer.AsyncAuditLogWriter;
 import io.github.mahorobonheur.audittrail.writer.AuditLogWriter;
 import io.github.mahorobonheur.audittrail.writer.DatabaseAuditLogWriter;
+import org.hibernate.boot.model.naming.PhysicalNamingStrategy;
+import org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.context.annotation.Bean;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.scheduling.annotation.EnableAsync;
 
 /**
@@ -39,6 +45,8 @@ import org.springframework.scheduling.annotation.EnableAsync;
 @AutoConfiguration
 @EnableAsync
 @EnableConfigurationProperties(AuditTrailProperties.class)
+@EntityScan(basePackageClasses = AuditLog.class)
+@EnableJpaRepositories(basePackageClasses = AuditLogRepository.class)
 @ConditionalOnProperty(prefix = "audit-trail", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class AuditTrailAutoConfiguration {
 
@@ -94,13 +102,37 @@ public class AuditTrailAutoConfiguration {
     }
 
     /**
+     * Applies {@code audit-trail.table-name} to the {@link AuditLog} entity table mapping.
+     */
+    @Bean
+    @ConditionalOnMissingBean(PhysicalNamingStrategy.class)
+    public PhysicalNamingStrategy auditTrailPhysicalNamingStrategy(AuditTrailProperties properties) {
+        return new AuditTrailTableNamingStrategy(properties.getTableName());
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public DatabaseAuditLogWriter databaseAuditLogWriter(AuditLogRepository repository,
+                                                         ObjectMapper objectMapper) {
+        return new DatabaseAuditLogWriter(repository, objectMapper);
+    }
+
+    /**
      * Default write strategy: persists audit events to the relational database.
      * Override by providing your own {@link AuditLogWriter} bean.
      */
     @Bean
     @ConditionalOnMissingBean(AuditLogWriter.class)
-    public AuditLogWriter auditLogWriter(AuditLogRepository repository, ObjectMapper objectMapper) {
-        return new DatabaseAuditLogWriter(repository, objectMapper);
+    @ConditionalOnProperty(prefix = "audit-trail", name = "async", havingValue = "false")
+    public AuditLogWriter syncAuditLogWriter(DatabaseAuditLogWriter databaseAuditLogWriter) {
+        return databaseAuditLogWriter;
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(AuditLogWriter.class)
+    @ConditionalOnProperty(prefix = "audit-trail", name = "async", havingValue = "true", matchIfMissing = true)
+    public AuditLogWriter asyncAuditLogWriter(DatabaseAuditLogWriter databaseAuditLogWriter) {
+        return new AsyncAuditLogWriter(databaseAuditLogWriter);
     }
 
     /**

@@ -1,9 +1,7 @@
 package io.github.mahorobonheur.audittrail.integration;
 
 import io.github.mahorobonheur.audittrail.annotation.AuditTrail;
-import io.github.mahorobonheur.audittrail.listener.AuditTrailEntityListener;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -16,7 +14,6 @@ import jakarta.persistence.Table;
 @Entity
 @Table(name = "test_user")
 @AuditTrail(exclude = {"password"})
-@EntityListeners(AuditTrailEntityListener.class)
 public class TestUser {
 
     @Id
