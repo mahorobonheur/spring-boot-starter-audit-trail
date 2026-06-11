@@ -58,7 +58,7 @@ jobs:
       # ── Upload JaCoCo HTML report for manual inspection
       - name: Upload JaCoCo HTML report
         if: always() && matrix.java == '17'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: jacoco-html-report
           path: target/site/jacoco/
@@ -67,7 +67,7 @@ jobs:
       # ── Upload JaCoCo XML for the coverage-gate job
       - name: Upload JaCoCo XML
         if: matrix.java == '17'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: jacoco-xml
           path: target/site/jacoco/jacoco.xml
@@ -76,7 +76,7 @@ jobs:
       # ── Upload Surefire XML reports for auditing
       - name: Upload Surefire reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: surefire-java-${{ matrix.java }}
           path: target/surefire-reports/
