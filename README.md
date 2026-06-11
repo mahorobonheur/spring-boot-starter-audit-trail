@@ -4,7 +4,7 @@
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.mahorobonheur/spring-boot-starter-audit-trail.svg)](https://central.sonatype.com/artifact/io.github.mahorobonheur/spring-boot-starter-audit-trail)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Java](https://img.shields.io/badge/Java-17%2B-orange.svg)](https://adoptium.net/)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.x-brightgreen.svg)](https://spring.io/projects/spring-boot)
 
 > Automatic, annotation-driven **field-level audit logging** for Spring Boot applications.  
 > Drop `@AuditTrail` on any JPA entity and get a complete, queryable change history — zero boilerplate required.
@@ -193,6 +193,7 @@ All properties are optional. The defaults work out of the box.
 | Property | Default | Description |
 |---|---|---|
 | `audit-trail.enabled` | `true` | Enable or disable the library globally |
+| `audit-trail.storage` | `database` | Storage backend: `database` (queryable table) or `log` (structured lines on the `audit-trail` log category) |
 | `audit-trail.table-name` | `audit_log` | Name of the audit log database table |
 | `audit-trail.async` | `true` | Write audit logs asynchronously (non-blocking) |
 | `audit-trail.rest.enabled` | `true` | Expose the REST query endpoint |
@@ -309,8 +310,8 @@ The auto-configuration (`AuditTrailAutoConfiguration`) wires all components toge
 
 | Version | Features |
 |---|---|
-| **v1.0** (current) | `@AuditTrail`, `@AuditExclude`, DB storage, REST endpoint, async writes |
-| **v1.1** | Log file backend, webhook backend, Spring Boot Actuator metrics |
+| **v1.0** (current) | `@AuditTrail`, `@AuditExclude`, DB storage, log backend, REST endpoint, async writes |
+| **v1.1** | Webhook backend, Spring Boot Actuator metrics |
 | **v1.2** | Multi-tenancy support, GraphQL API |
 | **v1.3** | Reactive support (Spring WebFlux / R2DBC) |
 

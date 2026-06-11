@@ -7,14 +7,15 @@ import org.springframework.scheduling.annotation.Async;
 import java.util.List;
 
 /**
- * Decorator that delegates to {@link DatabaseAuditLogWriter} on a background thread
- * when {@code audit-trail.async=true}.
+ * Decorator that delegates to the configured {@link AuditLogWriter} backend on a
+ * background thread when {@code audit-trail.async=true} (the default), so audit
+ * writes never block the originating request.
  */
 public class AsyncAuditLogWriter implements AuditLogWriter {
 
-    private final DatabaseAuditLogWriter delegate;
+    private final AuditLogWriter delegate;
 
-    public AsyncAuditLogWriter(DatabaseAuditLogWriter delegate) {
+    public AsyncAuditLogWriter(AuditLogWriter delegate) {
         this.delegate = delegate;
     }
 

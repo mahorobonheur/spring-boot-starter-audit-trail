@@ -10,7 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Log file storage backend (`audit-trail.storage=log`)
 - Webhook storage backend (`audit-trail.storage=webhook`)
 - Spring Boot Actuator metrics endpoint (`/actuator/audit-trail`)
 - Multi-tenancy support with tenant-scoped audit queries
@@ -28,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AuditSecurityResolver` — resolves the currently authenticated username from Spring Security's `SecurityContextHolder`; falls back to `"anonymous"` when no authentication is present
 - `AuditLogWriter` interface — pluggable strategy for persisting audit events; enables custom backends
 - `DatabaseAuditLogWriter` — default implementation that serialises field diffs to JSON and persists `AuditLog` entries asynchronously via `@Async`
+- `LogAuditLogWriter` — alternative backend (`audit-trail.storage=log`) that writes structured audit lines to the dedicated `audit-trail` SLF4J log category
 - `AuditLog` JPA entity — maps to the `audit_log` table with fields: `id`, `entityName`, `entityId`, `action`, `changedBy`, `changedAt`, `fieldDiffs`
 - `AuditAction` enum — `CREATE`, `UPDATE`, `DELETE`
 - `FieldDiff` Java record — `(field, oldValue, newValue)` with a human-readable `toString()`
@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Technical details
 - Minimum Java version: 17
-- Spring Boot compatibility: 3.x
+- Spring Boot compatibility: 4.x
 - Database: any JPA-compatible RDBMS (PostgreSQL, MySQL, H2, etc.)
 - Audit log writes are non-blocking by default (`@Async`)
 - All auto-configured beans use `@ConditionalOnMissingBean` — every component can be overridden

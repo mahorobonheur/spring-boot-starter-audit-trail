@@ -11,6 +11,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * <h2>Example {@code application.properties}</h2>
  * <pre>
  * audit-trail.enabled=true
+ * audit-trail.storage=database
  * audit-trail.table-name=audit_log
  * audit-trail.async=true
  * audit-trail.rest.enabled=true
@@ -24,6 +25,24 @@ public class AuditTrailProperties {
 
     /** Whether the audit trail feature is globally enabled. Defaults to {@code true}. */
     private boolean enabled = true;
+
+    /**
+     * Storage backend for audit events. Defaults to {@link Storage#DATABASE}.
+     * <ul>
+     *   <li>{@code database} — persists entries to the audit log table (queryable via REST/repository)</li>
+     *   <li>{@code log} — writes structured entries to the {@code audit-trail} SLF4J log category</li>
+     * </ul>
+     * A webhook backend is planned for v1.1.
+     */
+    private Storage storage = Storage.DATABASE;
+
+    /** Available storage backends. */
+    public enum Storage {
+        /** Persist audit entries to the relational database (default). */
+        DATABASE,
+        /** Write audit entries to the application log. */
+        LOG
+    }
 
     /**
      * Name of the database table where audit log entries are stored.
@@ -68,6 +87,8 @@ public class AuditTrailProperties {
 
     public boolean isEnabled()              { return enabled; }
     public void setEnabled(boolean v)       { this.enabled = v; }
+    public Storage getStorage()             { return storage; }
+    public void setStorage(Storage v)       { this.storage = v; }
     public String getTableName()            { return tableName; }
     public void setTableName(String v)      { this.tableName = v; }
     public boolean isAsync()                { return async; }

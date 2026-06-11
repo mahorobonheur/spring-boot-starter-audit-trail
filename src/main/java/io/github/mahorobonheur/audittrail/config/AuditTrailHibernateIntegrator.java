@@ -6,11 +6,13 @@ import org.hibernate.boot.spi.BootstrapContext;
 import org.hibernate.engine.spi.SessionFactoryImplementor;
 import org.hibernate.event.service.spi.EventListenerRegistry;
 import org.hibernate.event.spi.EventType;
+import org.hibernate.event.spi.PostInsertEvent;
+import org.hibernate.event.spi.PostInsertEventListener;
 import org.hibernate.event.spi.PostLoadEventListener;
 import org.hibernate.event.spi.PreDeleteEventListener;
-import org.hibernate.event.spi.PreInsertEventListener;
 import org.hibernate.event.spi.PreUpdateEventListener;
 import org.hibernate.integrator.spi.Integrator;
+import org.hibernate.persister.entity.EntityPersister;
 import org.hibernate.service.spi.ServiceRegistryImplementor;
 
 /**
@@ -29,9 +31,18 @@ public class AuditTrailHibernateIntegrator implements Integrator {
         ServiceRegistryImplementor serviceRegistry = sessionFactory.getServiceRegistry();
         EventListenerRegistry registry = serviceRegistry.getService(EventListenerRegistry.class);
 
-        registry.getEventListenerGroup(EventType.PRE_INSERT).appendListener((PreInsertEventListener) event -> {
-            listener.onPrePersist(event.getEntity());
-            return false;
+        // POST_INSERT (not PRE_INSERT) so that database-generated IDs (IDENTITY,
+        // sequence) are already assigned to the entity when the audit entry is written.
+        registry.getEventListenerGroup(EventType.POST_INSERT).appendListener(new PostInsertEventListener() {
+            @Override
+            public void onPostInsert(PostInsertEvent event) {
+                listener.onPrePersist(event.getEntity());
+            }
+
+            @Override
+            public boolean requiresPostCommitHandling(EntityPersister persister) {
+                return false;
+            }
         });
         registry.getEventListenerGroup(EventType.POST_LOAD).appendListener((PostLoadEventListener) event ->
                 listener.onPostLoad(event.getEntity()));

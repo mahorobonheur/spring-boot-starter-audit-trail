@@ -16,9 +16,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Constructor;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.WeakHashMap;
 
 /**
  * JPA {@code EntityListener} that intercepts entity lifecycle events for
@@ -46,10 +47,15 @@ public class AuditTrailEntityListener {
     private static final Logger log = LoggerFactory.getLogger(AuditTrailEntityListener.class);
 
     /**
-     * Stores a pre-update snapshot of each entity keyed by its identity hash.
+     * Stores a pre-update snapshot of each loaded entity, keyed by the entity instance.
      * This allows field-level diffs to be computed in {@link #onPreUpdate(Object)}.
+     *
+     * <p>A synchronized {@link WeakHashMap} is used so that entries are automatically
+     * garbage-collected together with their entities — entities that are loaded but
+     * never updated do not accumulate, and concurrent sessions are safe.
      */
-    private static final Map<Integer, Object> PRE_UPDATE_SNAPSHOTS = new HashMap<>();
+    private static final Map<Object, Object> PRE_UPDATE_SNAPSHOTS =
+            Collections.synchronizedMap(new WeakHashMap<>());
 
     // Lazy bean accessors — resolved at call time via SpringContextHolder
 
@@ -91,7 +97,7 @@ public class AuditTrailEntityListener {
     public void onPostLoad(Object entity) {
         if (!isAudited(entity)) return;
         try {
-            PRE_UPDATE_SNAPSHOTS.put(System.identityHashCode(entity), cloneShallow(entity));
+            PRE_UPDATE_SNAPSHOTS.put(entity, cloneShallow(entity));
         } catch (Exception e) {
             log.warn("Could not snapshot entity {} for audit: {}", entityName(entity), e.getMessage(), e);
         }
@@ -105,7 +111,7 @@ public class AuditTrailEntityListener {
     public void onPreUpdate(Object entity) {
         if (!isAudited(entity)) return;
         try {
-            Object snapshot = PRE_UPDATE_SNAPSHOTS.remove(System.identityHashCode(entity));
+            Object snapshot = PRE_UPDATE_SNAPSHOTS.remove(entity);
             List<FieldDiff> diffs = diffEngine().diff(snapshot, entity);
             if (!diffs.isEmpty()) {
                 write(entity, AuditAction.UPDATE, diffs);
@@ -124,7 +130,7 @@ public class AuditTrailEntityListener {
     public void onPreRemove(Object entity) {
         if (!isAudited(entity)) return;
         try {
-            Object snapshot = PRE_UPDATE_SNAPSHOTS.remove(System.identityHashCode(entity));
+            Object snapshot = PRE_UPDATE_SNAPSHOTS.remove(entity);
             Object oldState = snapshot != null ? snapshot : entity;
             List<FieldDiff> diffs = diffEngine().diff(oldState, null);
             write(entity, AuditAction.DELETE, diffs);

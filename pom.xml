@@ -99,16 +99,22 @@
             <artifactId>spring-boot-hibernate</artifactId>
         </dependency>
 
-        <!-- Spring Web (for REST controller) -->
+        <!-- Spring Web (for REST controller) — optional: the controller is only
+             registered when the host application is a servlet web application -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+            <optional>true</optional>
         </dependency>
 
-        <!-- Spring Security (for current-user resolution) -->
+        <!-- Spring Security (for current-user resolution) — optional: when absent,
+             AuditSecurityResolver falls back to "anonymous". Deliberately NOT the
+             starter so this library never force-enables security auto-configuration
+             in consuming applications. -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-security</artifactId>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
+            <optional>true</optional>
         </dependency>
 
         <!-- Jackson (JSON serialisation of field diffs) -->

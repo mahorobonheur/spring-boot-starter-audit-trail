@@ -10,16 +10,22 @@ import io.github.mahorobonheur.audittrail.security.AuditSecurityResolver;
 import io.github.mahorobonheur.audittrail.writer.AsyncAuditLogWriter;
 import io.github.mahorobonheur.audittrail.writer.AuditLogWriter;
 import io.github.mahorobonheur.audittrail.writer.DatabaseAuditLogWriter;
+import io.github.mahorobonheur.audittrail.writer.LogAuditLogWriter;
 import org.hibernate.boot.model.naming.PhysicalNamingStrategy;
-import org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Spring Boot auto-configuration for the audit trail starter.
@@ -110,11 +116,18 @@ public class AuditTrailAutoConfiguration {
         return new AuditTrailTableNamingStrategy(properties.getTableName());
     }
 
+    /**
+     * Persists each audit entry in its own {@code REQUIRES_NEW} transaction (when a
+     * transaction manager is available) so that synchronous writes are safe even
+     * when invoked from Hibernate event listeners during a flush.
+     */
     @Bean
     @ConditionalOnMissingBean
     public DatabaseAuditLogWriter databaseAuditLogWriter(AuditLogRepository repository,
-                                                         ObjectMapper objectMapper) {
-        return new DatabaseAuditLogWriter(repository, objectMapper);
+                                                         ObjectMapper objectMapper,
+                                                         ObjectProvider<PlatformTransactionManager> transactionManager) {
+        return new DatabaseAuditLogWriter(repository, objectMapper,
+                transactionManager.getIfAvailable());
     }
 
     /**
@@ -124,26 +137,55 @@ public class AuditTrailAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean(AuditLogWriter.class)
     @ConditionalOnProperty(prefix = "audit-trail", name = "async", havingValue = "false")
-    public AuditLogWriter syncAuditLogWriter(DatabaseAuditLogWriter databaseAuditLogWriter) {
-        return databaseAuditLogWriter;
+    public AuditLogWriter syncAuditLogWriter(AuditTrailProperties properties,
+                                             DatabaseAuditLogWriter databaseAuditLogWriter,
+                                             ObjectMapper objectMapper) {
+        return selectBackend(properties, databaseAuditLogWriter, objectMapper);
     }
 
     @Bean
     @ConditionalOnMissingBean(AuditLogWriter.class)
     @ConditionalOnProperty(prefix = "audit-trail", name = "async", havingValue = "true", matchIfMissing = true)
-    public AuditLogWriter asyncAuditLogWriter(DatabaseAuditLogWriter databaseAuditLogWriter) {
-        return new AsyncAuditLogWriter(databaseAuditLogWriter);
+    public AuditLogWriter asyncAuditLogWriter(AuditTrailProperties properties,
+                                              DatabaseAuditLogWriter databaseAuditLogWriter,
+                                              ObjectMapper objectMapper) {
+        return new AsyncAuditLogWriter(selectBackend(properties, databaseAuditLogWriter, objectMapper));
     }
 
     /**
-     * REST controller exposing {@code GET /audit-trail/{entity}/{id}}.
-     * Only registered when {@code audit-trail.rest.enabled=true} (default).
+     * Selects the storage backend configured via {@code audit-trail.storage}:
+     * {@code database} (default) or {@code log}.
      */
-    @Bean
-    @ConditionalOnMissingBean
+    private static AuditLogWriter selectBackend(AuditTrailProperties properties,
+                                                DatabaseAuditLogWriter databaseAuditLogWriter,
+                                                ObjectMapper objectMapper) {
+        return switch (properties.getStorage()) {
+            case LOG -> new LogAuditLogWriter(objectMapper);
+            case DATABASE -> databaseAuditLogWriter;
+        };
+    }
+
+    /**
+     * REST endpoint configuration. Kept in a nested class so the conditions are
+     * evaluated before any Spring MVC class is loaded — Spring Web is an optional
+     * dependency, and this configuration backs off entirely when it is absent or
+     * when the host application is not a servlet web application.
+     */
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(RestController.class)
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
     @ConditionalOnProperty(prefix = "audit-trail.rest", name = "enabled", havingValue = "true", matchIfMissing = true)
-    public AuditTrailController auditTrailController(AuditLogRepository repository,
-                                                      AuditTrailProperties properties) {
-        return new AuditTrailController(repository, properties);
+    static class AuditTrailRestConfiguration {
+
+        /**
+         * REST controller exposing {@code GET /audit-trail/{entity}/{id}}.
+         * Only registered when {@code audit-trail.rest.enabled=true} (default).
+         */
+        @Bean
+        @ConditionalOnMissingBean
+        public AuditTrailController auditTrailController(AuditLogRepository repository,
+                                                         AuditTrailProperties properties) {
+            return new AuditTrailController(repository, properties);
+        }
     }
 }
