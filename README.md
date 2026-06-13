@@ -1,7 +1,7 @@
-# spring-boot-starter-audit-trail
+# mahoro-audit-trail — by Bonheur Mahoro
 
-[![Build](https://github.com/mahorobonheur/spring-boot-starter-audit-trail/actions/workflows/build.yml/badge.svg)](https://github.com/mahorobonheur/spring-boot-starter-audit-trail/actions)
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.mahorobonheur/spring-boot-starter-audit-trail.svg)](https://central.sonatype.com/artifact/io.github.mahorobonheur/spring-boot-starter-audit-trail)
+[![Build](https://github.com/mahorobonheur/mahoro-audit-trail/actions/workflows/build.yml/badge.svg)](https://github.com/mahorobonheur/mahoro-audit-trail/actions)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.mahorobonheur/mahoro-audit-trail.svg)](https://central.sonatype.com/artifact/io.github.mahorobonheur/mahoro-audit-trail)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Java](https://img.shields.io/badge/Java-17%2B-orange.svg)](https://adoptium.net/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.x-brightgreen.svg)](https://spring.io/projects/spring-boot)
@@ -46,7 +46,7 @@ Existing solutions fall short:
 | **Javers** | Not Spring Boot native, verbose API, no auto-configuration |
 | **Hand-rolled AOP** | Duplicated in every codebase, inconsistent, untestable |
 
-`spring-boot-starter-audit-trail` fills the gap: **one annotation, clean field-level diffs, REST-queryable, Spring Boot native.**
+`mahoro-audit-trail` fills the gap: **one annotation, clean field-level diffs, REST-queryable, Spring Boot native.**
 
 ---
 
@@ -57,7 +57,7 @@ Existing solutions fall short:
 ```xml
 <dependency>
     <groupId>io.github.mahorobonheur</groupId>
-    <artifactId>spring-boot-starter-audit-trail</artifactId>
+    <artifactId>mahoro-audit-trail</artifactId>
     <version>1.0.0</version>
 </dependency>
 ```
@@ -212,6 +212,15 @@ audit-trail.table-name=my_audit_log
 audit-trail.async=false
 ```
 
+### Note on entity and repository registration
+
+The starter registers its `AuditLog` entity directly with Hibernate (via the
+`AdditionalMappingContributor` SPI) and builds its repository programmatically.
+It therefore works with **any** entity-scanning setup — including applications
+that declare their own `@EntityScan` or `@EnableJpaRepositories` — without any
+extra configuration, and never interferes with the scanning of your own
+entities and repositories.
+
 ### Example `application.yml`
 
 ```yaml
@@ -315,7 +324,7 @@ The auto-configuration (`AuditTrailAutoConfiguration`) wires all components toge
 | **v1.2** | Multi-tenancy support, GraphQL API |
 | **v1.3** | Reactive support (Spring WebFlux / R2DBC) |
 
-See the [full roadmap in the proposal document](https://github.com/mahorobonheur/spring-boot-starter-audit-trail/blob/main/docs/proposal.md).
+See the [full roadmap in the proposal document](https://github.com/mahorobonheur/mahoro-audit-trail/blob/main/docs/proposal.md).
 
 ---
 

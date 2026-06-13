@@ -23,7 +23,10 @@ import java.time.Instant;
  *
  * @author Bonheur Mahoro
  */
-@Entity
+// The explicit JPA entity name is namespaced because entity names must be unique
+// across the whole persistence unit — a host application with its own "AuditLog"
+// entity would otherwise collide with this one. The table name is unaffected.
+@Entity(name = "AuditTrailLog")
 @Table(name = "audit_log")
 public class AuditLog {
 

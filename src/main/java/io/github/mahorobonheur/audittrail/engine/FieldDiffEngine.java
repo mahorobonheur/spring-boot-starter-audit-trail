@@ -48,22 +48,13 @@ public class FieldDiffEngine {
 
         Object reference = (newEntity != null) ? newEntity : oldEntity;
         Class<?> entityClass = Hibernate.getClass(reference);
-
-        AuditTrail annotation = entityClass.getAnnotation(AuditTrail.class);
-        Set<String> excludedByAnnotation = (annotation != null)
-                ? new HashSet<>(Arrays.asList(annotation.exclude()))
-                : Collections.emptySet();
+        Set<String> excluded = excludedFieldNames(entityClass);
 
         List<Field> allFields = getAllFields(entityClass);
         List<FieldDiff> diffs = new ArrayList<>();
 
         for (Field field : allFields) {
-            // Skip fields excluded via @AuditTrail(exclude = {...})
-            if (excludedByAnnotation.contains(field.getName())) {
-                continue;
-            }
-            // Skip fields annotated with @AuditExclude
-            if (field.isAnnotationPresent(AuditExclude.class)) {
+            if (excluded.contains(field.getName())) {
                 continue;
             }
 
@@ -84,7 +75,67 @@ public class FieldDiffEngine {
         return Collections.unmodifiableList(diffs);
     }
 
+    /**
+     * Computes field-level diffs from Hibernate event state arrays, as provided by
+     * {@code PreUpdateEvent.getOldState()/getState()} and {@code PreDeleteEvent.getDeletedState()}.
+     *
+     * <p>This is the preferred path for UPDATE and DELETE events: the arrays come
+     * directly from Hibernate's own dirty-checking, so the resulting diff is
+     * guaranteed to reflect exactly what is written to the database. The identifier
+     * property is not part of these arrays.
+     *
+     * @param entityType    the audited entity class (used to resolve exclusions)
+     * @param propertyNames Hibernate persister property names, aligned with the state arrays
+     * @param oldState      property values before the change ({@code null} on CREATE)
+     * @param newState      property values after the change ({@code null} on DELETE)
+     * @return an unmodifiable list of {@link FieldDiff} objects, one per changed property
+     */
+    public List<FieldDiff> diff(Class<?> entityType,
+                                String[] propertyNames,
+                                Object[] oldState,
+                                Object[] newState) {
+        if (propertyNames == null) {
+            throw new IllegalArgumentException("propertyNames must be non-null");
+        }
+        Set<String> excluded = excludedFieldNames(entityType);
+        List<FieldDiff> diffs = new ArrayList<>();
+
+        for (int i = 0; i < propertyNames.length; i++) {
+            String name = propertyNames[i];
+            if (excluded.contains(name)) {
+                continue;
+            }
+            Object oldValue = (oldState != null && i < oldState.length) ? oldState[i] : null;
+            Object newValue = (newState != null && i < newState.length) ? newState[i] : null;
+
+            if (!Objects.equals(oldValue, newValue)) {
+                diffs.add(new FieldDiff(name, stringify(oldValue), stringify(newValue)));
+            }
+        }
+
+        return Collections.unmodifiableList(diffs);
+    }
+
     // Helpers
+
+    /**
+     * Returns the set of field names excluded from auditing for the given class:
+     * names listed in {@link AuditTrail#exclude()} plus fields annotated with
+     * {@link AuditExclude}.
+     */
+    private Set<String> excludedFieldNames(Class<?> entityClass) {
+        Set<String> excluded = new HashSet<>();
+        AuditTrail annotation = entityClass.getAnnotation(AuditTrail.class);
+        if (annotation != null) {
+            excluded.addAll(Arrays.asList(annotation.exclude()));
+        }
+        for (Field field : getAllFields(entityClass)) {
+            if (field.isAnnotationPresent(AuditExclude.class)) {
+                excluded.add(field.getName());
+            }
+        }
+        return excluded;
+    }
 
     /**
      * Collects all declared fields from the class and every superclass,

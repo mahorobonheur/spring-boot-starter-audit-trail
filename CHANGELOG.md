@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `spring-boot-starter-audit-trail` are documented in this file.
+All notable changes to **mahoro-audit-trail** by Bonheur Mahoro are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -49,5 +49,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/mahorobonheur/spring-boot-starter-audit-trail/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/mahorobonheur/spring-boot-starter-audit-trail/releases/tag/v1.0.0
+[Unreleased]: https://github.com/mahorobonheur/mahoro-audit-trail/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/mahorobonheur/mahoro-audit-trail/releases/tag/v1.0.0

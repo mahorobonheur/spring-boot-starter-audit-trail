@@ -8,7 +8,6 @@ import org.hibernate.event.service.spi.EventListenerRegistry;
 import org.hibernate.event.spi.EventType;
 import org.hibernate.event.spi.PostInsertEvent;
 import org.hibernate.event.spi.PostInsertEventListener;
-import org.hibernate.event.spi.PostLoadEventListener;
 import org.hibernate.event.spi.PreDeleteEventListener;
 import org.hibernate.event.spi.PreUpdateEventListener;
 import org.hibernate.integrator.spi.Integrator;
@@ -19,6 +18,10 @@ import org.hibernate.service.spi.ServiceRegistryImplementor;
  * Registers {@link AuditTrailEntityListener} with Hibernate so entities annotated with
  * {@link io.github.mahorobonheur.audittrail.annotation.AuditTrail} are audited without
  * declaring {@code @EntityListeners} on each entity class.
+ *
+ * <p>For UPDATE and DELETE events the listener receives Hibernate's property state
+ * arrays directly from the event, so diffs always reflect exactly what Hibernate
+ * writes to the database.
  */
 public class AuditTrailHibernateIntegrator implements Integrator {
 
@@ -44,14 +47,21 @@ public class AuditTrailHibernateIntegrator implements Integrator {
                 return false;
             }
         });
-        registry.getEventListenerGroup(EventType.POST_LOAD).appendListener((PostLoadEventListener) event ->
-                listener.onPostLoad(event.getEntity()));
+
         registry.getEventListenerGroup(EventType.PRE_UPDATE).appendListener((PreUpdateEventListener) event -> {
-            listener.onPreUpdate(event.getEntity());
+            listener.onPreUpdate(
+                    event.getEntity(),
+                    event.getPersister().getPropertyNames(),
+                    event.getOldState(),
+                    event.getState());
             return false;
         });
+
         registry.getEventListenerGroup(EventType.PRE_DELETE).appendListener((PreDeleteEventListener) event -> {
-            listener.onPreRemove(event.getEntity());
+            listener.onPreRemove(
+                    event.getEntity(),
+                    event.getPersister().getPropertyNames(),
+                    event.getDeletedState());
             return false;
         });
     }

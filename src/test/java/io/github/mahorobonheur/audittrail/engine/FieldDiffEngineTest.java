@@ -169,4 +169,58 @@ class FieldDiffEngineTest {
         FieldDiff diff = new FieldDiff("email", "old@x.com", "new@x.com");
         assertThat(diff.toString()).contains("email", "old@x.com", "new@x.com");
     }
+
+    // ── State-array diff (Hibernate event path) ─────────────────────────────
+
+    @Test
+    @DisplayName("State-array diff detects changed properties and respects exclusions")
+    void stateArrayDiff_detectsChangesAndRespectsExclusions() {
+        String[] names    = {"username", "password", "role"};
+        Object[] oldState = {"alice", "secret123", "USER"};
+        Object[] newState = {"alice", "newpassword", "ADMIN"};
+
+        List<FieldDiff> diffs = engine.diff(EntityWithExclusion.class, names, oldState, newState);
+
+        assertThat(diffs).hasSize(1);
+        assertThat(diffs.get(0).field()).isEqualTo("role");
+        assertThat(diffs.get(0).oldValue()).isEqualTo("USER");
+        assertThat(diffs.get(0).newValue()).isEqualTo("ADMIN");
+    }
+
+    @Test
+    @DisplayName("State-array diff with null newState (DELETE) lists all values with null newValue")
+    void stateArrayDiff_deleteEvent_nullNewState() {
+        String[] names    = {"name", "email", "age"};
+        Object[] oldState = {"Alice", "alice@x.com", 30};
+
+        List<FieldDiff> diffs = engine.diff(SimpleEntity.class, names, oldState, null);
+
+        assertThat(diffs).hasSize(3);
+        assertThat(diffs).allSatisfy(d -> assertThat(d.newValue()).isNull());
+    }
+
+    @Test
+    @DisplayName("State-array diff respects @AuditExclude field annotation")
+    void stateArrayDiff_respectsAuditExcludeAnnotation() {
+        String[] names    = {"email", "token"};
+        Object[] oldState = {"a@x.com", "token-old"};
+        Object[] newState = {"b@x.com", "token-new"};
+
+        List<FieldDiff> diffs = engine.diff(EntityWithFieldAnnotation.class, names, oldState, newState);
+
+        assertThat(diffs).extracting(FieldDiff::field)
+                .containsExactly("email")
+                .doesNotContain("token");
+    }
+
+    @Test
+    @DisplayName("State-array diff returns empty list when nothing changed")
+    void stateArrayDiff_noChanges_returnsEmptyList() {
+        String[] names    = {"name", "email"};
+        Object[] state    = {"Alice", "alice@x.com"};
+
+        List<FieldDiff> diffs = engine.diff(SimpleEntity.class, names, state, state.clone());
+
+        assertThat(diffs).isEmpty();
+    }
 }

@@ -98,6 +98,9 @@ public class DatabaseAuditLogWriter implements AuditLogWriter {
         } catch (JsonProcessingException e) {
             log.error("Failed to serialise field diffs for entity={}, id={}: {}",
                     entityName, entityId, e.getMessage(), e);
+        } catch (Exception e) {
+            log.error("Failed to persist audit log for entity={}, id={}, action={}: {}",
+                    entityName, entityId, action, e.getMessage(), e);
         }
     }
 }

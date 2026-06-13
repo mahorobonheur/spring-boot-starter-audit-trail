@@ -8,18 +8,18 @@
 
     <!--Coordinates -->
     <groupId>io.github.mahorobonheur</groupId>
-    <artifactId>spring-boot-starter-audit-trail</artifactId>
+    <artifactId>mahoro-audit-trail</artifactId>
     <version>1.0.0</version>
     <packaging>jar</packaging>
 
     <!--  Project metadata -->
-    <name>spring-boot-starter-audit-trail</name>
+    <name>mahoro-audit-trail</name>
     <description>
         Automatic, annotation-driven field-level audit logging for Spring Boot applications.
         Drop @AuditTrail on any JPA entity and get a complete, queryable change history
         with zero boilerplate.
     </description>
-    <url>https://github.com/mahorobonheur/spring-boot-starter-audit-trail</url>
+    <url>https://github.com/mahorobonheur/mahoro-audit-trail</url>
     <inceptionYear>2026</inceptionYear>
 
     <licenses>
@@ -44,15 +44,15 @@
     </developers>
 
     <scm>
-        <connection>scm:git:git://github.com/mahorobonheur/spring-boot-starter-audit-trail.git</connection>
-        <developerConnection>scm:git:ssh://github.com/mahorobonheur/spring-boot-starter-audit-trail.git</developerConnection>
-        <url>https://github.com/mahorobonheur/spring-boot-starter-audit-trail</url>
+        <connection>scm:git:git://github.com/mahorobonheur/mahoro-audit-trail.git</connection>
+        <developerConnection>scm:git:ssh://github.com/mahorobonheur/mahoro-audit-trail.git</developerConnection>
+        <url>https://github.com/mahorobonheur/mahoro-audit-trail</url>
         <tag>HEAD</tag>
     </scm>
 
     <issueManagement>
         <system>GitHub Issues</system>
-        <url>https://github.com/mahorobonheur/spring-boot-starter-audit-trail/issues</url>
+        <url>https://github.com/mahorobonheur/mahoro-audit-trail/issues</url>
     </issueManagement>
 
     <!-- ── Spring Boot parent (manages dependency versions) -->
@@ -181,7 +181,7 @@
         <!-- GitHub Packages (used by default deploy; CI publishes snapshots here) -->
         <snapshotRepository>
             <id>github</id>
-            <url>https://maven.pkg.github.com/mahorobonheur/spring-boot-starter-audit-trail</url>
+            <url>https://maven.pkg.github.com/mahorobonheur/mahoro-audit-trail</url>
         </snapshotRepository>
         <!-- Maven Central Portal (used only with -P release) -->
         <repository>
@@ -313,7 +313,7 @@
                             <tokenAuth>true</tokenAuth>
                             <autoPublish>true</autoPublish>
                             <waitUntil>published</waitUntil>
-                            <deploymentName>spring-boot-starter-audit-trail</deploymentName>
+                            <deploymentName>mahoro-audit-trail</deploymentName>
                         </configuration>
                     </plugin>
 
