@@ -1,15 +1,14 @@
 package io.github.mahorobonheur.audittrail.writer;
 
-import io.github.mahorobonheur.audittrail.model.AuditAction;
-import io.github.mahorobonheur.audittrail.model.FieldDiff;
+import io.github.mahorobonheur.audittrail.model.AuditWriteRequest;
 import org.springframework.scheduling.annotation.Async;
-
-import java.util.List;
 
 /**
  * Decorator that delegates to the configured {@link AuditLogWriter} backend on a
  * background thread when {@code audit-trail.async=true} (the default), so audit
  * writes never block the originating request.
+ *
+ * @author Bonheur Mahoro
  */
 public class AsyncAuditLogWriter implements AuditLogWriter {
 
@@ -21,11 +20,7 @@ public class AsyncAuditLogWriter implements AuditLogWriter {
 
     @Async
     @Override
-    public void write(String entityName,
-                      String entityId,
-                      AuditAction action,
-                      String changedBy,
-                      List<FieldDiff> diffs) {
-        delegate.write(entityName, entityId, action, changedBy, diffs);
+    public void write(AuditWriteRequest request) {
+        delegate.write(request);
     }
 }

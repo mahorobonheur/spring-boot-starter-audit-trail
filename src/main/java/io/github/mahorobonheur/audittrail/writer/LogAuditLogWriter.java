@@ -2,7 +2,7 @@ package io.github.mahorobonheur.audittrail.writer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.mahorobonheur.audittrail.model.AuditAction;
+import io.github.mahorobonheur.audittrail.model.AuditWriteRequest;
 import io.github.mahorobonheur.audittrail.model.FieldDiff;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,16 +44,29 @@ public class LogAuditLogWriter implements AuditLogWriter {
      * {@inheritDoc}
      *
      * <p>Emits a single structured log line containing the entity name, ID,
-     * action, user, UTC timestamp, and the JSON-serialised field diffs.
+     * action, user, UTC timestamp, the JSON-serialised field diffs, and —
+     * when present — the business reason.
      */
     @Override
-    public void write(String entityName,
-                      String entityId,
-                      AuditAction action,
-                      String changedBy,
-                      List<FieldDiff> diffs) {
-        AUDIT_LOG.info("entity={} id={} action={} by={} at={} diffs={}",
-                entityName, entityId, action, changedBy, Instant.now(), toJson(diffs));
+    public void write(AuditWriteRequest request) {
+        if (request.getWhyReason() != null) {
+            AUDIT_LOG.info("entity={} id={} action={} by={} at={} why={} diffs={}",
+                    request.getEntityName(),
+                    request.getEntityId(),
+                    request.getAction(),
+                    request.getChangedBy(),
+                    Instant.now(),
+                    request.getWhyReason(),
+                    toJson(request.getDiffs()));
+        } else {
+            AUDIT_LOG.info("entity={} id={} action={} by={} at={} diffs={}",
+                    request.getEntityName(),
+                    request.getEntityId(),
+                    request.getAction(),
+                    request.getChangedBy(),
+                    Instant.now(),
+                    toJson(request.getDiffs()));
+        }
     }
 
     private String toJson(List<FieldDiff> diffs) {

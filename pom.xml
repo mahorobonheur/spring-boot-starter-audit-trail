@@ -117,6 +117,22 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- AspectJ (for @AuditWhy AOP support) — optional: aspect is only registered
+             when the weaver is on the classpath. -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-aspects</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Spring Boot Actuator (for audit-trail actuator endpoint) — optional: endpoint
+             is only registered when Actuator is present. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- Jackson (JSON serialisation of field diffs) -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>

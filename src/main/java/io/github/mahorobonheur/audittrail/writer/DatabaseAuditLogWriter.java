@@ -2,10 +2,11 @@ package io.github.mahorobonheur.audittrail.writer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.mahorobonheur.audittrail.model.AuditAction;
+import io.github.mahorobonheur.audittrail.anomaly.AuditAnomalyDetector;
 import io.github.mahorobonheur.audittrail.model.AuditLog;
-import io.github.mahorobonheur.audittrail.model.FieldDiff;
+import io.github.mahorobonheur.audittrail.model.AuditWriteRequest;
 import io.github.mahorobonheur.audittrail.repository.AuditLogRepository;
+import io.github.mahorobonheur.audittrail.service.AuditChainService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -13,7 +14,7 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
-import java.util.List;
+import java.util.Optional;
 
 /**
  * Default {@link AuditLogWriter} implementation that persists audit events
@@ -28,6 +29,13 @@ import java.util.List;
  * fire <em>during</em> a flush, and saving through the same session mid-flush
  * can corrupt Hibernate's action queue.
  *
+ * <p>When {@link AuditChainService} is present (i.e., {@code audit-trail.chain.enabled=true}),
+ * the last entry for the same entity+id is looked up and a chain hash is computed and
+ * stored in the new entry's {@code prevHash} column.
+ *
+ * <p>When {@link AuditAnomalyDetector} is present, it is called after each successful
+ * save to evaluate anomaly rules.
+ *
  * <p>Field diffs are serialised to JSON using Jackson before storage.
  *
  * @author Bonheur Mahoro
@@ -36,16 +44,20 @@ public class DatabaseAuditLogWriter implements AuditLogWriter {
 
     private static final Logger log = LoggerFactory.getLogger(DatabaseAuditLogWriter.class);
 
-    private final AuditLogRepository repository;
-    private final ObjectMapper objectMapper;
-    private final TransactionTemplate transactionTemplate;
+    private final AuditLogRepository     repository;
+    private final ObjectMapper           objectMapper;
+    private final TransactionTemplate    transactionTemplate;
+    private final AuditChainService      chainService;      // nullable
+    private final AuditAnomalyDetector   anomalyDetector;   // nullable
+
+    // ── Constructors ──────────────────────────────────────────────────────────
 
     /**
      * Creates a writer that saves directly through the repository without
      * transaction isolation. Intended for unit tests and custom setups.
      */
     public DatabaseAuditLogWriter(AuditLogRepository repository, ObjectMapper objectMapper) {
-        this(repository, objectMapper, null);
+        this(repository, objectMapper, null, null, null);
     }
 
     /**
@@ -55,8 +67,27 @@ public class DatabaseAuditLogWriter implements AuditLogWriter {
     public DatabaseAuditLogWriter(AuditLogRepository repository,
                                   ObjectMapper objectMapper,
                                   PlatformTransactionManager transactionManager) {
-        this.repository   = repository;
-        this.objectMapper = objectMapper;
+        this(repository, objectMapper, transactionManager, null, null);
+    }
+
+    /**
+     * Full constructor used by the auto-configuration when optional services are available.
+     *
+     * @param repository         the audit log repository
+     * @param objectMapper       Jackson mapper for diff serialisation
+     * @param transactionManager transaction manager for REQUIRES_NEW isolation; may be {@code null}
+     * @param chainService       optional chain-hash service; {@code null} when chain is disabled
+     * @param anomalyDetector    optional anomaly detector; {@code null} when anomaly detection is disabled
+     */
+    public DatabaseAuditLogWriter(AuditLogRepository repository,
+                                  ObjectMapper objectMapper,
+                                  PlatformTransactionManager transactionManager,
+                                  AuditChainService chainService,
+                                  AuditAnomalyDetector anomalyDetector) {
+        this.repository      = repository;
+        this.objectMapper    = objectMapper;
+        this.chainService    = chainService;
+        this.anomalyDetector = anomalyDetector;
         if (transactionManager != null) {
             TransactionTemplate template = new TransactionTemplate(transactionManager);
             template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -66,41 +97,69 @@ public class DatabaseAuditLogWriter implements AuditLogWriter {
         }
     }
 
+    // ── AuditLogWriter ────────────────────────────────────────────────────────
+
     /**
      * {@inheritDoc}
      *
-     * <p>Serialises {@code diffs} to a JSON string and persists the resulting
-     * {@link AuditLog} entity.
+     * <p>Serialises {@code request.getDiffs()} to a JSON string, optionally computes
+     * a chain hash, then persists the resulting {@link AuditLog} entity and optionally
+     * runs anomaly detection.
      */
     @Override
-    public void write(String entityName,
-                      String entityId,
-                      AuditAction action,
-                      String changedBy,
-                      List<FieldDiff> diffs) {
+    public void write(AuditWriteRequest request) {
         try {
-            String diffsJson = objectMapper.writeValueAsString(diffs);
-            AuditLog entry = new AuditLog(
-                    entityName,
-                    entityId,
-                    action,
-                    changedBy,
-                    Instant.now(),
-                    diffsJson
-            );
-            if (transactionTemplate != null) {
-                transactionTemplate.executeWithoutResult(status -> repository.save(entry));
-            } else {
-                repository.save(entry);
+            String diffsJson = objectMapper.writeValueAsString(request.getDiffs());
+
+            // Resolve prevHash from chain service when enabled
+            String prevHash = null;
+            if (chainService != null) {
+                Optional<AuditLog> last = repository
+                        .findTopByEntityNameAndEntityIdOrderByChangedAtDesc(
+                                request.getEntityName(), request.getEntityId());
+                if (last.isPresent()) {
+                    prevHash = chainService.computeChainHash(last.get().getPrevHash(), last.get());
+                }
             }
+
+            final String resolvedPrevHash = prevHash;
+
+            AuditLog entry = new AuditLog(
+                    request.getEntityName(),
+                    request.getEntityId(),
+                    request.getAction(),
+                    request.getChangedBy(),
+                    Instant.now(),
+                    diffsJson,
+                    request.getWhyReason(),
+                    request.isHasMaskedFields(),
+                    request.getSnapshotLabel(),
+                    resolvedPrevHash
+            );
+
+            AuditLog saved;
+            if (transactionTemplate != null) {
+                saved = transactionTemplate.execute(status -> repository.save(entry));
+            } else {
+                saved = repository.save(entry);
+            }
+
             log.debug("Audit log saved: entity={}, id={}, action={}, by={}",
-                    entityName, entityId, action, changedBy);
+                    request.getEntityName(), request.getEntityId(),
+                    request.getAction(), request.getChangedBy());
+
+            // Post-save anomaly detection
+            if (anomalyDetector != null && saved != null) {
+                try {
+                    anomalyDetector.evaluate(saved);
+                } catch (Exception e) {
+                    log.warn("Anomaly detection failed for entry {}: {}", saved.getId(), e.getMessage(), e);
+                }
+            }
+
         } catch (JsonProcessingException e) {
-            log.error("Failed to serialise field diffs for entity={}, id={}: {}",
-                    entityName, entityId, e.getMessage(), e);
-        } catch (Exception e) {
-            log.error("Failed to persist audit log for entity={}, id={}, action={}: {}",
-                    entityName, entityId, action, e.getMessage(), e);
+            log.error("Failed to serialise field diffs for entity={} id={}: {}",
+                    request.getEntityName(), request.getEntityId(), e.getMessage(), e);
         }
     }
 }

@@ -76,3 +76,8 @@ spring.log
 *.bak
 *.swp
 *~
+
+
+mahoro-audit-trail-proposal.docx
+mahoro-audit-trail-testing-guide.docx
+mahoro-audit-trail-user-guide.docx

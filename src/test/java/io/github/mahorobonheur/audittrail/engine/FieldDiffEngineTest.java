@@ -1,7 +1,9 @@
 package io.github.mahorobonheur.audittrail.engine;
 
 import io.github.mahorobonheur.audittrail.annotation.AuditExclude;
+import io.github.mahorobonheur.audittrail.annotation.AuditMask;
 import io.github.mahorobonheur.audittrail.annotation.AuditTrail;
+import io.github.mahorobonheur.audittrail.engine.FieldDiffEngine.DiffResult;
 import io.github.mahorobonheur.audittrail.model.FieldDiff;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -67,6 +69,23 @@ class FieldDiffEngineTest {
         }
     }
 
+    @AuditTrail
+    static class EntityWithMaskedField {
+        String email;
+
+        @AuditMask
+        String password;
+
+        @AuditMask(placeholder = "***")
+        String creditCard;
+
+        EntityWithMaskedField(String email, String password, String creditCard) {
+            this.email      = email;
+            this.password   = password;
+            this.creditCard = creditCard;
+        }
+    }
+
     // ── Tests ────────────────────────────────────────────────────────────────
 
     @Test
@@ -75,9 +94,10 @@ class FieldDiffEngineTest {
         SimpleEntity oldE = new SimpleEntity("Alice", "alice@x.com", 30);
         SimpleEntity newE = new SimpleEntity("Alice", "alice@x.com", 30);
 
-        List<FieldDiff> diffs = engine.diff(oldE, newE);
+        DiffResult result = engine.diff(oldE, newE);
 
-        assertThat(diffs).isEmpty();
+        assertThat(result.getDiffs()).isEmpty();
+        assertThat(result.isHasMaskedFields()).isFalse();
     }
 
     @Test
@@ -86,7 +106,7 @@ class FieldDiffEngineTest {
         SimpleEntity oldE = new SimpleEntity("Alice", "alice@x.com", 30);
         SimpleEntity newE = new SimpleEntity("Alice", "newalice@x.com", 30);
 
-        List<FieldDiff> diffs = engine.diff(oldE, newE);
+        List<FieldDiff> diffs = engine.diff(oldE, newE).getDiffs();
 
         assertThat(diffs).hasSize(1);
         assertThat(diffs.get(0).field()).isEqualTo("email");
@@ -100,7 +120,7 @@ class FieldDiffEngineTest {
         SimpleEntity oldE = new SimpleEntity("Alice", "alice@x.com", 30);
         SimpleEntity newE = new SimpleEntity("Bob",   "bob@x.com",   25);
 
-        List<FieldDiff> diffs = engine.diff(oldE, newE);
+        List<FieldDiff> diffs = engine.diff(oldE, newE).getDiffs();
 
         assertThat(diffs).hasSize(3);
         assertThat(diffs).extracting(FieldDiff::field)
@@ -112,7 +132,7 @@ class FieldDiffEngineTest {
     void createEvent_oldEntityNull_allFieldsWithNullOldValue() {
         SimpleEntity newE = new SimpleEntity("Alice", "alice@x.com", 30);
 
-        List<FieldDiff> diffs = engine.diff(null, newE);
+        List<FieldDiff> diffs = engine.diff(null, newE).getDiffs();
 
         assertThat(diffs).isNotEmpty();
         assertThat(diffs).allSatisfy(d -> assertThat(d.oldValue()).isNull());
@@ -125,7 +145,7 @@ class FieldDiffEngineTest {
     void deleteEvent_newEntityNull_allFieldsWithNullNewValue() {
         SimpleEntity oldE = new SimpleEntity("Alice", "alice@x.com", 30);
 
-        List<FieldDiff> diffs = engine.diff(oldE, null);
+        List<FieldDiff> diffs = engine.diff(oldE, null).getDiffs();
 
         assertThat(diffs).isNotEmpty();
         assertThat(diffs).allSatisfy(d -> assertThat(d.newValue()).isNull());
@@ -137,7 +157,7 @@ class FieldDiffEngineTest {
         EntityWithExclusion oldE = new EntityWithExclusion("alice", "secret123", "USER");
         EntityWithExclusion newE = new EntityWithExclusion("alice", "newpassword", "ADMIN");
 
-        List<FieldDiff> diffs = engine.diff(oldE, newE);
+        List<FieldDiff> diffs = engine.diff(oldE, newE).getDiffs();
 
         assertThat(diffs).extracting(FieldDiff::field).doesNotContain("password");
         assertThat(diffs).extracting(FieldDiff::field).contains("role");
@@ -149,10 +169,47 @@ class FieldDiffEngineTest {
         EntityWithFieldAnnotation oldE = new EntityWithFieldAnnotation("alice@x.com", "token-old");
         EntityWithFieldAnnotation newE = new EntityWithFieldAnnotation("newalice@x.com", "token-new");
 
-        List<FieldDiff> diffs = engine.diff(oldE, newE);
+        List<FieldDiff> diffs = engine.diff(oldE, newE).getDiffs();
 
         assertThat(diffs).extracting(FieldDiff::field).doesNotContain("token");
         assertThat(diffs).extracting(FieldDiff::field).contains("email");
+    }
+
+    @Test
+    @DisplayName("@AuditMask fields appear with placeholder value and hasMaskedFields=true")
+    void maskedField_replacedWithPlaceholderAndFlagSet() {
+        EntityWithMaskedField oldE = new EntityWithMaskedField("alice@x.com", "secret", "4111111111111111");
+        EntityWithMaskedField newE = new EntityWithMaskedField("alice@x.com", "newsecret", "4111111111111111");
+
+        DiffResult result = engine.diff(oldE, newE);
+
+        assertThat(result.isHasMaskedFields()).isTrue();
+
+        // Password field should appear with default placeholder
+        List<FieldDiff> diffs = result.getDiffs();
+        assertThat(diffs).extracting(FieldDiff::field).contains("password");
+        FieldDiff passwordDiff = diffs.stream()
+                .filter(d -> d.field().equals("password"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(passwordDiff.oldValue()).isEqualTo("[MASKED]");
+        assertThat(passwordDiff.newValue()).isEqualTo("[MASKED]");
+    }
+
+    @Test
+    @DisplayName("@AuditMask with custom placeholder uses that placeholder")
+    void maskedFieldWithCustomPlaceholder_usesCustomPlaceholder() {
+        EntityWithMaskedField entity = new EntityWithMaskedField("a@x.com", "pass", "4111");
+
+        DiffResult result = engine.diff(null, entity);
+
+        List<FieldDiff> diffs = result.getDiffs();
+        FieldDiff ccDiff = diffs.stream()
+                .filter(d -> d.field().equals("creditCard"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(ccDiff.oldValue()).isEqualTo("***");
+        assertThat(ccDiff.newValue()).isEqualTo("***");
     }
 
     @Test
@@ -179,7 +236,7 @@ class FieldDiffEngineTest {
         Object[] oldState = {"alice", "secret123", "USER"};
         Object[] newState = {"alice", "newpassword", "ADMIN"};
 
-        List<FieldDiff> diffs = engine.diff(EntityWithExclusion.class, names, oldState, newState);
+        List<FieldDiff> diffs = engine.diff(EntityWithExclusion.class, names, oldState, newState).getDiffs();
 
         assertThat(diffs).hasSize(1);
         assertThat(diffs.get(0).field()).isEqualTo("role");
@@ -193,7 +250,7 @@ class FieldDiffEngineTest {
         String[] names    = {"name", "email", "age"};
         Object[] oldState = {"Alice", "alice@x.com", 30};
 
-        List<FieldDiff> diffs = engine.diff(SimpleEntity.class, names, oldState, null);
+        List<FieldDiff> diffs = engine.diff(SimpleEntity.class, names, oldState, null).getDiffs();
 
         assertThat(diffs).hasSize(3);
         assertThat(diffs).allSatisfy(d -> assertThat(d.newValue()).isNull());
@@ -206,7 +263,7 @@ class FieldDiffEngineTest {
         Object[] oldState = {"a@x.com", "token-old"};
         Object[] newState = {"b@x.com", "token-new"};
 
-        List<FieldDiff> diffs = engine.diff(EntityWithFieldAnnotation.class, names, oldState, newState);
+        List<FieldDiff> diffs = engine.diff(EntityWithFieldAnnotation.class, names, oldState, newState).getDiffs();
 
         assertThat(diffs).extracting(FieldDiff::field)
                 .containsExactly("email")
@@ -219,8 +276,27 @@ class FieldDiffEngineTest {
         String[] names    = {"name", "email"};
         Object[] state    = {"Alice", "alice@x.com"};
 
-        List<FieldDiff> diffs = engine.diff(SimpleEntity.class, names, state, state.clone());
+        List<FieldDiff> diffs = engine.diff(SimpleEntity.class, names, state, state.clone()).getDiffs();
 
         assertThat(diffs).isEmpty();
+    }
+
+    @Test
+    @DisplayName("State-array diff masks fields annotated with @AuditMask")
+    void stateArrayDiff_masksAnnotatedFields() {
+        String[] names    = {"email", "password"};
+        Object[] oldState = {"a@x.com", "secret"};
+        Object[] newState = {"a@x.com", "newsecret"};
+
+        DiffResult result = engine.diff(EntityWithMaskedField.class, names, oldState, newState);
+
+        assertThat(result.isHasMaskedFields()).isTrue();
+        List<FieldDiff> diffs = result.getDiffs();
+        assertThat(diffs).extracting(FieldDiff::field).contains("password");
+        FieldDiff passwordDiff = diffs.stream()
+                .filter(d -> d.field().equals("password"))
+                .findFirst().orElseThrow();
+        assertThat(passwordDiff.oldValue()).isEqualTo("[MASKED]");
+        assertThat(passwordDiff.newValue()).isEqualTo("[MASKED]");
     }
 }

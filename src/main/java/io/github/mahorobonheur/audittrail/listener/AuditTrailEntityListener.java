@@ -1,10 +1,13 @@
 package io.github.mahorobonheur.audittrail.listener;
 
 import io.github.mahorobonheur.audittrail.annotation.AuditTrail;
+import io.github.mahorobonheur.audittrail.config.AuditTrailProperties;
 import io.github.mahorobonheur.audittrail.config.SpringContextHolder;
+import io.github.mahorobonheur.audittrail.context.AuditWhyContext;
 import io.github.mahorobonheur.audittrail.engine.FieldDiffEngine;
+import io.github.mahorobonheur.audittrail.engine.FieldDiffEngine.DiffResult;
 import io.github.mahorobonheur.audittrail.model.AuditAction;
-import io.github.mahorobonheur.audittrail.model.FieldDiff;
+import io.github.mahorobonheur.audittrail.model.AuditWriteRequest;
 import io.github.mahorobonheur.audittrail.security.AuditSecurityResolver;
 import io.github.mahorobonheur.audittrail.writer.AuditLogWriter;
 import org.hibernate.Hibernate;
@@ -14,7 +17,8 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 
 /**
- * Intercepts entity lifecycle events for entities annotated with {@link AuditTrail}.
+ * Intercepts entity lifecycle events for entities annotated with {@link AuditTrail}
+ * or when {@code audit-trail.mode=ALL}.
  *
  * <p>This listener is registered globally with Hibernate via
  * {@link io.github.mahorobonheur.audittrail.config.AuditTrailHibernateIntegrator},
@@ -37,7 +41,7 @@ public class AuditTrailEntityListener {
 
     private static final Logger log = LoggerFactory.getLogger(AuditTrailEntityListener.class);
 
-    // Lazy bean accessors — resolved at call time via SpringContextHolder
+    // ── Lazy bean accessors ───────────────────────────────────────────────────
 
     private AuditLogWriter writer() {
         return SpringContextHolder.getBean(AuditLogWriter.class);
@@ -51,18 +55,17 @@ public class AuditTrailEntityListener {
         return SpringContextHolder.getBean(FieldDiffEngine.class);
     }
 
-    // Lifecycle callbacks (invoked by AuditTrailHibernateIntegrator)
+    // ── Lifecycle callbacks ───────────────────────────────────────────────────
 
     /**
-     * Fires after a new entity has been inserted (so database-generated IDs are
-     * already assigned). Records a CREATE audit event listing all non-excluded
-     * fields with {@code oldValue = null}.
+     * Fires after a new entity has been inserted. Records a CREATE audit event
+     * listing all non-excluded fields with {@code oldValue = null}.
      */
     public void onPrePersist(Object entity) {
         if (!isAudited(entity)) return;
         try {
-            List<FieldDiff> diffs = diffEngine().diff(null, entity);
-            write(entity, AuditAction.CREATE, diffs);
+            DiffResult result = diffEngine().diff(null, entity);
+            write(entity, AuditAction.CREATE, result);
         } catch (Exception e) {
             log.warn("Audit trail failed for CREATE on {}: {}", entityName(entity), e.getMessage(), e);
         }
@@ -74,18 +77,17 @@ public class AuditTrailEntityListener {
      *
      * @param entity        the managed entity with its new state
      * @param propertyNames persister property names aligned with the state arrays
-     * @param oldState      property values before the change (may be {@code null}
-     *                      when Hibernate has no loaded state available)
+     * @param oldState      property values before the change
      * @param newState      property values being written
      */
     public void onPreUpdate(Object entity, String[] propertyNames, Object[] oldState, Object[] newState) {
         if (!isAudited(entity)) return;
         try {
-            List<FieldDiff> diffs = (propertyNames != null && oldState != null)
+            DiffResult result = (propertyNames != null && oldState != null)
                     ? diffEngine().diff(Hibernate.getClass(entity), propertyNames, oldState, newState)
                     : diffEngine().diff(null, entity);
-            if (!diffs.isEmpty()) {
-                write(entity, AuditAction.UPDATE, diffs);
+            if (!result.getDiffs().isEmpty()) {
+                write(entity, AuditAction.UPDATE, result);
             }
         } catch (Exception e) {
             log.warn("Audit trail failed for UPDATE on {}: {}", entityName(entity), e.getMessage(), e);
@@ -94,30 +96,45 @@ public class AuditTrailEntityListener {
 
     /**
      * Fires just before an entity is deleted. Records a DELETE audit event listing
-     * all non-excluded fields with {@code newValue = null}, using Hibernate's
-     * deleted-state array when available.
+     * all non-excluded fields with {@code newValue = null}.
      *
      * @param entity        the entity being removed
      * @param propertyNames persister property names aligned with {@code deletedState}
-     * @param deletedState  property values at deletion time (may be {@code null})
+     * @param deletedState  property values at deletion time
      */
     public void onPreRemove(Object entity, String[] propertyNames, Object[] deletedState) {
         if (!isAudited(entity)) return;
         try {
-            List<FieldDiff> diffs = (propertyNames != null && deletedState != null)
+            DiffResult result = (propertyNames != null && deletedState != null)
                     ? diffEngine().diff(Hibernate.getClass(entity), propertyNames, deletedState, null)
                     : diffEngine().diff(entity, null);
-            write(entity, AuditAction.DELETE, diffs);
+            write(entity, AuditAction.DELETE, result);
         } catch (Exception e) {
             log.warn("Audit trail failed for DELETE on {}: {}", entityName(entity), e.getMessage(), e);
         }
     }
 
-    // Helpers
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /**
+     * Determines whether the given entity should be audited, taking into account
+     * the configured {@link AuditTrailProperties.Mode} and any exclude-lists.
+     */
     private boolean isAudited(Object entity) {
-        return entity != null
-                && Hibernate.getClass(entity).isAnnotationPresent(AuditTrail.class);
+        if (entity == null) return false;
+        Class<?> cls = Hibernate.getClass(entity);
+        // Never self-audit the AuditLog entity — would cause infinite recursion
+        if (cls.getName().equals("io.github.mahorobonheur.audittrail.model.AuditLog")) return false;
+        try {
+            AuditTrailProperties props = SpringContextHolder.getBean(AuditTrailProperties.class);
+            if (props.getMode() == AuditTrailProperties.Mode.ALL) {
+                List<String> excluded = props.getExcludeEntities();
+                return excluded == null || !excluded.contains(cls.getSimpleName());
+            }
+        } catch (Exception ignored) {
+            // Fall through to annotation-based check
+        }
+        return cls.isAnnotationPresent(AuditTrail.class);
     }
 
     private String entityName(Object entity) {
@@ -125,7 +142,6 @@ public class AuditTrailEntityListener {
     }
 
     private String entityId(Object entity) {
-        // Try common ID field names; return the identity hash code as fallback.
         Class<?> entityClass = Hibernate.getClass(entity);
         for (String idField : new String[]{"id", "ID", "Id"}) {
             try {
@@ -149,13 +165,20 @@ public class AuditTrailEntityListener {
         return null;
     }
 
-    private void write(Object entity, AuditAction action, List<FieldDiff> diffs) {
-        writer().write(
-                entityName(entity),
-                entityId(entity),
-                action,
-                securityResolver().getCurrentUser(),
-                diffs
-        );
+    private void write(Object entity, AuditAction action, DiffResult result) {
+        String whyReason = AuditWhyContext.get().orElse(null);
+        AuditWhyContext.clear();
+
+        AuditWriteRequest request = AuditWriteRequest.builder()
+                .entityName(entityName(entity))
+                .entityId(entityId(entity))
+                .action(action)
+                .changedBy(securityResolver().getCurrentUser())
+                .diffs(result.getDiffs())
+                .whyReason(whyReason)
+                .hasMaskedFields(result.isHasMaskedFields())
+                .build();
+
+        writer().write(request);
     }
 }
