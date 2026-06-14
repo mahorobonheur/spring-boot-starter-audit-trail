@@ -9,7 +9,7 @@
     <!--Coordinates -->
     <groupId>io.github.mahorobonheur</groupId>
     <artifactId>mahoro-audit-trail</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
     <packaging>jar</packaging>
 
     <!--  Project metadata -->
@@ -34,7 +34,7 @@
         <developer>
             <id>mahorobonheur</id>
             <name>Bonheur Mahoro</name>
-            <email>bonheur.mahoro@amalitechtraining.org</email>
+            <email>mahorobonheur123@gmail.com</email>
             <url>https://github.com/mahorobonheur</url>
             <roles>
                 <role>author</role>
