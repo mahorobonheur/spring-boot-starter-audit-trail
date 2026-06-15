@@ -1,11 +1,11 @@
 # mahoro-audit-trail
 
-[![Build](https://github.com/mahorobonheur/mahoro-audit-trail/actions/workflows/ci.yml/badge.svg)](https://github.com/mahorobonheur/mahoro-audit-trail/actions)
+[![Build](https://github.com/mahorobonheur/spring-boot-starter-audit-trail/actions/workflows/ci.yml/badge.svg)](https://github.com/mahorobonheur/spring-boot-starter-audit-trail/actions)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.mahorobonheur/mahoro-audit-trail.svg)](https://central.sonatype.com/artifact/io.github.mahorobonheur/mahoro-audit-trail)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Java](https://img.shields.io/badge/Java-17%2B-orange.svg)](https://adoptium.net/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x%20%7C%204.x-brightgreen.svg)](https://spring.io/projects/spring-boot)
-[![Coverage](https://img.shields.io/badge/coverage-80%25%2B-green.svg)](https://github.com/mahorobonheur/mahoro-audit-trail/actions)
+[![Coverage](https://img.shields.io/badge/coverage-80%25%2B-green.svg)](https://github.com/mahorobonheur/spring-boot-starter-audit-trail/actions)
 
 > Automatic, annotation-driven **field-level audit logging** for Spring Boot applications.  
 > Drop `@AuditTrail` on any JPA entity and get a complete, queryable, tamper-proof change history — zero boilerplate required.
