@@ -1,4 +1,4 @@
-# Contributing to spring-boot-starter-audit-trail
+# Contributing to mahoro-audit-trail
 
 Thank you for taking the time to contribute! Every improvement — whether a bug fix, new feature, or documentation update — makes this library better for everyone. This guide explains how to get involved.
 
@@ -66,9 +66,8 @@ mvn test
 # Full build including sources and Javadoc JARs
 mvn clean package
 
-# Run with coverage report
+# Run with coverage report (report at target/site/jacoco/index.html)
 mvn clean verify
-# Coverage report: target/site/jacoco/index.html
 ```
 
 ---
@@ -78,20 +77,29 @@ mvn clean verify
 ```
 src/
 ├── main/java/io/github/mahorobonheur/audittrail/
-│   ├── annotation/        @AuditTrail, @AuditExclude
-│   ├── config/            Auto-configuration and properties
-│   ├── controller/        REST endpoint
-│   ├── engine/            FieldDiffEngine — core diff logic
-│   ├── listener/          JPA EntityListener
-│   ├── model/             AuditLog entity, AuditAction enum, FieldDiff record
-│   ├── repository/        Spring Data JPA repository
-│   ├── security/          AuditSecurityResolver
-│   └── writer/            AuditLogWriter interface + DatabaseAuditLogWriter
+│   ├── actuator/      AuditTrailActuatorEndpoint — Spring Boot Actuator endpoint
+│   ├── annotation/    @AuditTrail, @AuditExclude, @AuditMask, @AuditWhy, @AuditSnapshot
+│   ├── anomaly/       AuditAnomalyDetector, AuditAnomalyEvent — sliding-window rules
+│   ├── aspect/        AuditWhyAspect — AOP aspect for @AuditWhy parameter interception
+│   ├── config/        AuditTrailAutoConfiguration, AuditTrailProperties
+│   ├── context/       AuditWhyContext — ThreadLocal business reason holder
+│   ├── controller/    AuditTrailController — REST endpoints
+│   ├── engine/        FieldDiffEngine — core field-level diff logic
+│   ├── listener/      AuditTrailEntityListener — Hibernate SPI integration
+│   ├── model/         AuditLog, AuditAction, FieldDiff, AuditWriteRequest
+│   ├── repository/    AuditLogRepository — Spring Data JPA repository
+│   ├── security/      AuditSecurityResolver — Spring Security integration
+│   ├── service/       AuditChainService, AuditSnapshotService, AuditReconstructionService
+│   └── writer/        AuditLogWriter interface, DatabaseAuditLogWriter, AsyncAuditLogWriter,
+│                      LogAuditLogWriter
 ├── main/resources/
 │   └── META-INF/spring/   AutoConfiguration.imports (starter registration)
 └── test/java/
+    ├── annotation/        AuditTrailAnnotationTest
     ├── engine/            FieldDiffEngineTest (unit tests)
-    └── integration/       AuditTrailIntegrationTest (full flow tests)
+    ├── integration/       AuditTrailIntegrationTest, AuditTrailPostgresIntegrationTest
+    ├── security/          AuditSecurityResolverTest
+    └── writer/            DatabaseAuditLogWriterTest, LogAuditLogWriterTest
 ```
 
 ---
@@ -109,6 +117,7 @@ When filing a bug report, please include:
 - Expected behaviour vs. actual behaviour
 - Your Java version, Spring Boot version, and library version
 - A minimal code sample or repository link if possible
+- The full stack trace if applicable
 
 ### Suggesting Features
 
@@ -138,13 +147,14 @@ Open a [GitHub Discussion](https://github.com/mahorobonheur/spring-boot-starter-
 
 ## Code Standards
 
-- **Java version:** Use Java 17+ features where appropriate — records, sealed classes, text blocks, `var` are all encouraged.
+- **Java version:** Use Java 17+ features where appropriate — records, sealed classes, text blocks, `var`, pattern matching `instanceof` are all encouraged.
 - **Style:** Follow the [Google Java Style Guide](https://google.github.io/styleguide/javaguide.html).
 - **Formatting:** 4-space indentation, no tabs, UTF-8 encoding.
 - **Javadoc:** All `public` and `protected` APIs must have complete Javadoc, including `@param`, `@return`, and `@throws` where relevant.
 - **No wildcard imports:** Always use explicit imports.
 - **Null safety:** Prefer `Optional` or defensive null checks over returning raw `null` from public APIs.
-- **Thread safety:** Any shared state must be documented and properly synchronised.
+- **Thread safety:** Any shared mutable state must be documented and properly synchronised.
+- **Backwards compatibility:** Never break a public API in a minor or patch release. Deprecate first, remove later.
 
 ---
 
@@ -177,20 +187,22 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/):
 ```
 feat(engine): support nested object field comparison
 fix(listener): handle entities without default constructor
-docs(readme): add configuration reference table
-test(integration): add DELETE event integration test
+docs(readme): add @AuditWhy usage example
+test(chain): add chain verification integration test
+chore(deps): bump spring-boot from 3.3.0 to 3.4.0
 ```
 
 ---
 
 ## Testing Guidelines
 
-- **Unit tests** go in `src/test/java/.../engine/` or alongside the class being tested.
-- **Integration tests** go in `src/test/java/.../integration/` and use Spring Boot Test with H2.
+- **Unit tests** go alongside the class being tested (e.g. `engine/`, `writer/`).
+- **Integration tests** go in `integration/` and use Spring Boot Test with H2.
 - **Coverage:** Test coverage must remain above **80%** (enforced by JaCoCo in CI).
 - **Test naming:** Use `@DisplayName` with a plain English description of the scenario.
 - **Assertions:** Use [AssertJ](https://assertj.github.io/doc/) — it produces clearer failure messages than JUnit assertions.
-- **Async behaviour:** Use [Awaitility](http://www.awaitility.org/) for any tests involving async audit writes.
+- **Async behaviour:** Use [Awaitility](http://www.awaitility.org/) for tests involving async audit writes.
+- **Mocking:** Use Mockito. Avoid mocking types you do not own.
 
 ---
 
