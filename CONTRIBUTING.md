@@ -108,7 +108,7 @@ src/
 
 ### Reporting Bugs
 
-Before opening a new issue, please search [existing issues](https://github.com/mahorobonheur/spring-boot-starter-audit-trail/issues) to avoid duplicates.
+Before opening a new issue, please search [existing issues](https://github.com/mahorobonheur/mahoro-audit-trail/issues) to avoid duplicates.
 
 When filing a bug report, please include:
 
@@ -121,7 +121,7 @@ When filing a bug report, please include:
 
 ### Suggesting Features
 
-Open a [GitHub Discussion](https://github.com/mahorobonheur/spring-boot-starter-audit-trail/discussions) or a GitHub Issue labelled `enhancement`. Describe:
+Open a [GitHub Discussion](https://github.com/mahorobonheur/mahoro-audit-trail/discussions) or a GitHub Issue labelled `enhancement`. Describe:
 
 - The problem you are trying to solve
 - Your proposed solution and why it fits the library's design
