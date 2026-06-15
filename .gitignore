@@ -78,6 +78,5 @@ spring.log
 *~
 
 
-mahoro-audit-trail-proposal.docx
-mahoro-audit-trail-testing-guide.docx
-mahoro-audit-trail-user-guide.docx
+# ── Working documents (internal only) ────────────────────────────────────────
+*.docx

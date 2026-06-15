@@ -32,12 +32,12 @@ This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.
 1. **Fork** the repository on GitHub.
 2. **Clone** your fork locally:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/spring-boot-starter-audit-trail.git
-   cd spring-boot-starter-audit-trail
+   git clone https://github.com/YOUR_USERNAME/mahoro-audit-trail.git
+   cd mahoro-audit-trail
    ```
 3. **Add the upstream remote** so you can stay in sync:
    ```bash
-   git remote add upstream https://github.com/mahorobonheur/spring-boot-starter-audit-trail.git
+   git remote add upstream https://github.com/mahorobonheur/mahoro-audit-trail.git
    ```
 4. **Create a feature branch** from `main`:
    ```bash

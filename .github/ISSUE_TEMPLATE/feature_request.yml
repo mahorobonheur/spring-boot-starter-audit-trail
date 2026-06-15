@@ -1,0 +1,90 @@
+name: Feature Request
+description: Suggest a new feature or enhancement for mahoro-audit-trail
+title: "[Feature]: "
+labels: ["enhancement"]
+assignees:
+  - mahorobonheur
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting an improvement! Please describe your idea clearly so it can be evaluated and prioritized. For informal discussion before opening a formal request, consider posting in [GitHub Discussions — Ideas](https://github.com/mahorobonheur/spring-boot-starter-audit-trail/discussions) first.
+
+  - type: dropdown
+    id: feature-type
+    attributes:
+      label: Feature Type
+      description: What kind of change are you proposing?
+      options:
+        - New annotation
+        - New configuration property
+        - New storage backend / writer
+        - New REST endpoint
+        - Performance improvement
+        - Spring Boot / JPA compatibility
+        - Developer experience / documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem are you trying to solve? Describe the current limitation clearly.
+      placeholder: |
+        Currently, when I do X, the library does Y. This is a problem because...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe your proposed feature and how it would work.
+      placeholder: |
+        I would like the library to support Z so that...
+        Example usage:
+
+        @AuditTrail
+        @Entity
+        public class MyEntity { ... }
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you tried any workarounds or considered alternative approaches?
+      placeholder: I considered doing X but it does not work because...
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Real-World Use Case
+      description: Briefly describe the application or context where you need this feature.
+      placeholder: I am building a financial audit system that requires...
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: How important is this to you?
+      options:
+        - Nice to have
+        - Important — I can work around it for now
+        - Critical — blocking my use of the library
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and discussions — this has not been requested before
+          required: true
+        - label: This feature fits the library's scope (JPA audit trail for Spring Boot)
+          required: true
+        - label: I am willing to contribute a PR for this feature if guided

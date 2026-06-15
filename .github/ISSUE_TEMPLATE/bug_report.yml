@@ -1,0 +1,121 @@
+name: Bug Report
+description: Report a bug or unexpected behavior in mahoro-audit-trail
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+assignees:
+  - mahorobonheur
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to report a bug. Please fill in all required fields — incomplete reports slow down the fix. Before submitting, please [search existing issues](https://github.com/mahorobonheur/spring-boot-starter-audit-trail/issues) to avoid duplicates.
+
+  - type: input
+    id: library-version
+    attributes:
+      label: Library Version
+      description: Which version of mahoro-audit-trail are you using?
+      placeholder: e.g. 1.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: spring-boot-version
+    attributes:
+      label: Spring Boot Version
+      placeholder: e.g. 3.3.0
+    validations:
+      required: true
+
+  - type: input
+    id: java-version
+    attributes:
+      label: Java Version
+      placeholder: e.g. 17, 21
+    validations:
+      required: true
+
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database
+      description: Which database is your application using?
+      options:
+        - PostgreSQL
+        - MySQL / MariaDB
+        - H2 (in-memory)
+        - Oracle
+        - SQL Server
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear description of what happened versus what you expected.
+      placeholder: |
+        What happened:
+        What I expected:
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Provide the minimal steps needed to reproduce the bug.
+      placeholder: |
+        1. Annotate entity with @AuditTrail
+        2. Call repository.save(entity)
+        3. Query /audit-trail/Entity/1
+        4. See error / wrong behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: entity-example
+    attributes:
+      label: Entity / Code Sample
+      description: Paste a minimal entity class or code snippet that demonstrates the issue.
+      render: java
+      placeholder: |
+        @Entity
+        @AuditTrail
+        public class MyEntity {
+            @Id private Long id;
+            private String name;
+        }
+
+  - type: textarea
+    id: stacktrace
+    attributes:
+      label: Stack Trace or Error Message
+      description: Paste the full stack trace if there is one.
+      render: text
+
+  - type: textarea
+    id: configuration
+    attributes:
+      label: Relevant Configuration
+      description: Paste any audit-trail.* properties you have set.
+      render: yaml
+      placeholder: |
+        audit-trail:
+          enabled: true
+          storage: database
+          async: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this is not a duplicate
+          required: true
+        - label: I am using a supported version (1.0.0 or later)
+          required: true
+        - label: I have included all required information above
+          required: true
