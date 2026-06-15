@@ -15,6 +15,7 @@ jobs:
   verify:
     name: Verify before release
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Checkout tag
         uses: actions/checkout@v6
