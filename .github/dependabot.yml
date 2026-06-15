@@ -53,6 +53,7 @@ updates:
       day: monday
       time: "06:00"
       timezone: Africa/Kigali
+      target-branch: "develop"
     open-pull-requests-limit: 5
     labels:
       - dependencies
