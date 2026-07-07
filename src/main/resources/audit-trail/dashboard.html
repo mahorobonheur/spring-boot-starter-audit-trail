@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Audit Trail Dashboard</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 36 36' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0' y1='0' x2='36' y2='36' gradientUnits='userSpaceOnUse'%3E%3Cstop stop-color='%236366f1'/%3E%3Cstop offset='1' stop-color='%23a855f7'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='36' height='36' rx='8' fill='url(%23bg)'/%3E%3Cpath d='M18 7.5L11 10.5V17C11 21.2 14 24.8 18 26.2C22 24.8 25 21.2 25 17V10.5Z' fill='white' fill-opacity='0.25'/%3E%3Cpath d='M14 17L16.8 20L23 13' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='10.5' cy='31' r='1.8' fill='white' fill-opacity='0.55'/%3E%3Cline x1='13' y1='31' x2='23' y2='31' stroke='white' stroke-opacity='0.35' stroke-width='1.3' stroke-dasharray='2.2 1.8' stroke-linecap='round'/%3E%3Ccircle cx='25.5' cy='31' r='1.3' fill='white' fill-opacity='0.3'/%3E%3C/svg%3E"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:        #0a0e1a;
+    --surface:   #111827;
+    --surface2:  #1e2a3a;
+    --border:    #1e3a5f;
+    --primary:   #6366f1;
+    --primary2:  #818cf8;
+    --accent:    #a855f7;
+    --success:   #10b981;
+    --warning:   #f59e0b;
+    --danger:    #ef4444;
+    --info:      #38bdf8;
+    --text:      #e2e8f0;
+    --muted:     #64748b;
+    --sidebar-w: 230px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── Layout ── */
+  #app { display: flex; height: 100vh; overflow: hidden; }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: var(--sidebar-w); min-width: var(--sidebar-w);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    transition: width .3s, min-width .3s;
+    overflow: hidden;
+    z-index: 100;
+  }
+  #sidebar.collapsed { width: 56px; min-width: 56px; }
+  .sidebar-header {
+    padding: 18px 16px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    white-space: nowrap; overflow: hidden;
+  }
+  .logo-icon {
+    width: 36px; height: 36px; min-width: 36px;
+    border-radius: 10px;
+    box-shadow: 0 0 16px rgba(99,102,241,.55);
+    display: block;
+    flex-shrink: 0;
+  }
+  .logo-text { font-size: 13px; font-weight: 700; line-height: 1.2; }
+  .logo-sub  { font-size: 10px; color: var(--muted); }
+
+  nav { flex: 1; padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 10px; border-radius: 8px; cursor: pointer;
+    white-space: nowrap; overflow: hidden;
+    transition: background .15s, color .15s;
+    color: var(--muted); font-weight: 500;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: rgba(99,102,241,.18); color: var(--primary2); }
+  .nav-icon { font-size: 17px; min-width: 20px; text-align: center; }
+  .nav-label { font-size: 13px; }
+
+  .sidebar-footer {
+    padding: 10px 8px;
+    border-top: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .auto-refresh-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; white-space: nowrap; overflow: hidden;
+    color: var(--muted); font-size: 12px;
+  }
+  .toggle { position: relative; width: 32px; height: 18px; min-width: 32px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute; inset: 0; background: var(--surface2);
+    border-radius: 18px; cursor: pointer; transition: background .2s;
+    border: 1px solid var(--border);
+  }
+  .slider::before {
+    content: ''; position: absolute;
+    width: 12px; height: 12px;
+    left: 2px; top: 2px;
+    background: var(--muted);
+    border-radius: 50%; transition: transform .2s, background .2s;
+  }
+  input:checked + .slider { background: rgba(99,102,241,.3); border-color: var(--primary); }
+  input:checked + .slider::before { transform: translateX(14px); background: var(--primary2); }
+
+  #collapse-btn {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 8px; cursor: pointer;
+    color: var(--muted); font-size: 13px; font-weight: 500;
+    transition: background .15s; white-space: nowrap; overflow: hidden;
+  }
+  #collapse-btn:hover { background: var(--surface2); color: var(--text); }
+
+  /* ── Main ── */
+  #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* ── Top bar ── */
+  #topbar {
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface);
+  }
+  #topbar h1 { font-size: 16px; font-weight: 600; flex: 1; }
+  .badge {
+    font-size: 10px; padding: 2px 7px; border-radius: 20px; font-weight: 600;
+    background: rgba(99,102,241,.2); color: var(--primary2);
+    border: 1px solid rgba(99,102,241,.3);
+  }
+  .topbar-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 7px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface2);
+    color: var(--text); font-size: 12px; font-weight: 500;
+    transition: border-color .15s, background .15s;
+  }
+  .topbar-btn:hover { border-color: var(--primary); background: rgba(99,102,241,.1); }
+  #last-updated { font-size: 11px; color: var(--muted); }
+
+  /* ── Content ── */
+  #content { flex: 1; overflow-y: auto; padding: 24px; }
+
+  /* ── Tabs ── */
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  /* ── Grid ── */
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .grid-4, .grid-2 { grid-template-columns: 1fr; } }
+
+  /* ── Card ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    transition: border-color .2s;
+  }
+  .card:hover { border-color: rgba(99,102,241,.4); }
+  .card-title { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 12px; }
+
+  /* ── Stat card ── */
+  .stat-card { position: relative; overflow: hidden; }
+  .stat-card::before {
+    content: ''; position: absolute;
+    top: -30px; right: -30px;
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    opacity: .08;
+  }
+  .stat-card.c-primary::before { background: var(--primary); }
+  .stat-card.c-accent::before  { background: var(--accent); }
+  .stat-card.c-success::before { background: var(--success); }
+  .stat-card.c-info::before    { background: var(--info); }
+  .stat-icon { font-size: 22px; margin-bottom: 8px; }
+  .stat-value { font-size: 32px; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+  .stat-label { font-size: 12px; color: var(--muted); }
+  .c-primary .stat-value { color: var(--primary2); }
+  .c-accent  .stat-value { color: var(--accent); }
+  .c-success .stat-value { color: var(--success); }
+  .c-info    .stat-value { color: var(--info); }
+
+  /* ── Section title ── */
+  .section-title { font-size: 15px; font-weight: 700; margin: 24px 0 12px; display: flex; align-items: center; gap: 8px; }
+  .section-title span { font-size: 18px; }
+
+  /* ── Table ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 10px 12px; border-bottom: 1px solid rgba(30,58,95,.5); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr.clickable:hover td { background: var(--surface2); cursor: pointer; }
+
+  /* ── Action badge ── */
+  .action-badge {
+    display: inline-block; font-size: 10px; font-weight: 700;
+    padding: 2px 8px; border-radius: 20px; text-transform: uppercase;
+  }
+  .action-CREATE { background: rgba(16,185,129,.15); color: var(--success); border: 1px solid rgba(16,185,129,.3); }
+  .action-UPDATE { background: rgba(99,102,241,.15); color: var(--primary2); border: 1px solid rgba(99,102,241,.3); }
+  .action-DELETE { background: rgba(239,68,68,.15); color: var(--danger); border: 1px solid rgba(239,68,68,.3); }
+
+  /* ── Diff viewer ── */
+  .diff-wrap { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+  .diff-field { font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 2px; }
+  .diff-row { display: flex; gap: 8px; }
+  .diff-old, .diff-new {
+    flex: 1; padding: 4px 8px; border-radius: 5px; font-size: 12px;
+    font-family: 'Cascadia Code', 'Fira Code', monospace; word-break: break-all;
+  }
+  .diff-old { background: rgba(239,68,68,.1); color: #fca5a5; border: 1px solid rgba(239,68,68,.2); }
+  .diff-new { background: rgba(16,185,129,.1); color: #6ee7b7; border: 1px solid rgba(16,185,129,.2); }
+  .diff-label { font-size: 10px; color: var(--muted); margin-bottom: 2px; }
+
+  /* ── Expandable row ── */
+  .expand-row td { padding: 0; }
+  .expand-content {
+    padding: 16px 20px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+  .expand-content.hidden { display: none; }
+
+  /* ── Search / filter bar ── */
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .search-input, .select-input {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 7px; padding: 7px 10px;
+    font-size: 13px; outline: none; transition: border-color .15s;
+  }
+  .search-input { flex: 1; min-width: 130px; }
+  .search-input:focus, .select-input:focus { border-color: var(--primary); }
+  .select-input option { background: var(--surface2); }
+  .filter-sep { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+  /* ── Buttons ── */
+  .btn {
+    padding: 7px 14px; border-radius: 7px; cursor: pointer;
+    border: 1px solid var(--primary); background: rgba(99,102,241,.15);
+    color: var(--primary2); font-size: 13px; font-weight: 600;
+    transition: background .15s; white-space: nowrap;
+  }
+  .btn:hover { background: rgba(99,102,241,.3); }
+  .btn-danger { border-color: var(--danger); background: rgba(239,68,68,.1); color: #fca5a5; }
+  .btn-danger:hover { background: rgba(239,68,68,.25); }
+  .btn-success { border-color: var(--success); background: rgba(16,185,129,.1); color: #6ee7b7; }
+  .btn-success:hover { background: rgba(16,185,129,.25); }
+
+  /* ── Pagination ── */
+  .pagination-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding-top: 14px; margin-top: 6px;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .page-btn {
+    padding: 5px 12px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface2);
+    color: var(--text); font-size: 12px; font-weight: 500;
+    transition: border-color .15s, color .15s;
+  }
+  .page-btn:hover:not([disabled]) { border-color: var(--primary); color: var(--primary2); }
+  .page-btn[disabled] { opacity: 0.35; cursor: default; }
+  .page-info { font-size: 12px; color: var(--muted); flex: 1; }
+  .page-label { font-size: 12px; color: var(--muted); }
+
+  /* ── Chain verifier ── */
+  .chain-result {
+    margin-top: 20px; padding: 20px; border-radius: 10px;
+    display: none;
+  }
+  .chain-result.valid   { background: rgba(16,185,129,.1); border: 1px solid rgba(16,185,129,.3); }
+  .chain-result.broken  { background: rgba(239,68,68,.1);  border: 1px solid rgba(239,68,68,.3); }
+  .chain-status { font-size: 24px; font-weight: 800; margin-bottom: 6px; }
+  .chain-valid-text  { color: var(--success); }
+  .chain-broken-text { color: var(--danger); }
+
+  /* ── Entity bar ── */
+  .entity-bar-wrap { display: flex; flex-direction: column; gap: 8px; }
+  .entity-row { display: flex; align-items: center; gap: 10px; }
+  .entity-name { min-width: 120px; font-size: 13px; font-weight: 600; color: var(--text); }
+  .entity-bar-bg { flex: 1; height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+  .entity-bar-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--primary), var(--accent)); transition: width .6s cubic-bezier(.4,0,.2,1); }
+  .entity-count { min-width: 50px; text-align: right; font-size: 12px; color: var(--muted); }
+
+  /* ── Timeline ── */
+  .timeline { display: flex; flex-direction: column; gap: 0; }
+  .tl-item { display: flex; gap: 14px; position: relative; padding-bottom: 18px; }
+  .tl-item:last-child { padding-bottom: 0; }
+  .tl-dot-wrap { display: flex; flex-direction: column; align-items: center; }
+  .tl-dot {
+    width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+    margin-top: 4px; border: 2px solid var(--bg);
+  }
+  .tl-line { flex: 1; width: 2px; background: var(--border); margin-top: 2px; }
+  .tl-dot.CREATE { background: var(--success); }
+  .tl-dot.UPDATE { background: var(--primary2); }
+  .tl-dot.DELETE { background: var(--danger); }
+  .tl-body { flex: 1; }
+  .tl-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .tl-action { font-size: 11px; font-weight: 700; }
+  .CREATE .tl-action { color: var(--success); }
+  .UPDATE .tl-action { color: var(--primary2); }
+  .DELETE .tl-action { color: var(--danger); }
+  .tl-time { font-size: 11px; color: var(--muted); }
+  .tl-by { font-size: 11px; color: var(--muted); }
+
+  /* ── Toast ── */
+  #toast-container { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 8px; z-index: 999; }
+  .toast {
+    padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 500;
+    box-shadow: 0 4px 20px rgba(0,0,0,.4);
+    animation: slideIn .3s ease;
+    max-width: 300px;
+  }
+  .toast.success { background: rgba(16,185,129,.9); color: #fff; }
+  .toast.error   { background: rgba(239,68,68,.9);  color: #fff; }
+  .toast.info    { background: rgba(99,102,241,.9);  color: #fff; }
+  @keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  /* ── Loading ── */
+  .skeleton { background: linear-gradient(90deg, var(--surface2) 25%, var(--surface) 50%, var(--surface2) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 6px; }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  .spin { animation: spin .8s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Misc ── */
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; }
+  .empty-state .icon { font-size: 40px; margin-bottom: 10px; }
+  .mono { font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 11px; color: var(--muted); }
+  .chip { display: inline-block; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 2px 8px; font-size: 11px; color: var(--muted); }
+  .mt-16 { margin-top: 16px; }
+  .gap-top { margin-top: 24px; }
+  code { font-family: monospace; background: var(--surface2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Sidebar ── -->
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <svg class="logo-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="atBg" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#6366f1"/>
+            <stop offset="1" stop-color="#a855f7"/>
+          </linearGradient>
+          <linearGradient id="atShine" x1="0" y1="0" x2="0" y2="1">
+            <stop stop-color="white" stop-opacity="0.18"/>
+            <stop offset="1" stop-color="white" stop-opacity="0"/>
+          </linearGradient>
+          <filter id="atGlow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <!-- Background -->
+        <rect width="36" height="36" rx="10" fill="url(#atBg)"/>
+        <!-- Top-glass shimmer -->
+        <rect x="3" y="3" width="30" height="14" rx="8" fill="url(#atShine)"/>
+        <!-- Shield body -->
+        <path d="M18 7.5 L11 10.5 V17 C11 21.2 14 24.8 18 26.2 C22 24.8 25 21.2 25 17 V10.5 Z"
+              fill="white" fill-opacity="0.18" stroke="white" stroke-width="0.6" stroke-opacity="0.35"/>
+        <!-- Checkmark (verified / audit) -->
+        <path d="M14 17 L16.8 20 L23 13" stroke="white" stroke-width="2.1"
+              stroke-linecap="round" stroke-linejoin="round" filter="url(#atGlow)"/>
+        <!-- Trail: leading dot, dashes, trailing dot -->
+        <circle cx="10.5" cy="31" r="1.8" fill="white" fill-opacity="0.55"/>
+        <line x1="13" y1="31" x2="23" y2="31" stroke="white" stroke-opacity="0.32"
+              stroke-width="1.3" stroke-dasharray="2.2 1.8" stroke-linecap="round"/>
+        <circle cx="25.5" cy="31" r="1.3" fill="white" fill-opacity="0.28"/>
+      </svg>
+      <div class="logo-text-wrap">
+        <div class="logo-text">Audit Trail</div>
+        <div class="logo-sub">mahoro-audit-trail</div>
+      </div>
+    </div>
+    <nav>
+      <div class="nav-item active" onclick="switchTab('overview')" id="nav-overview">
+        <span class="nav-icon">📊</span><span class="nav-label">Overview</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('explorer')" id="nav-explorer">
+        <span class="nav-icon">🔍</span><span class="nav-label">Explorer</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('chain')" id="nav-chain">
+        <span class="nav-icon">🔗</span><span class="nav-label">Chain Verify</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('reconstruct')" id="nav-reconstruct">
+        <span class="nav-icon">⏪</span><span class="nav-label">Reconstruct</span>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="auto-refresh-row">
+        <label class="toggle"><input type="checkbox" id="auto-refresh-toggle" onchange="toggleAutoRefresh()"/><span class="slider"></span></label>
+        <span>Auto-refresh</span>
+      </div>
+      <div id="collapse-btn" onclick="toggleSidebar()">
+        <span class="nav-icon" id="collapse-icon">◀</span>
+        <span class="nav-label">Collapse</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Main ── -->
+  <div id="main">
+    <div id="topbar">
+      <h1 id="tab-title">Overview</h1>
+      <span class="badge" id="tab-badge">Live</span>
+      <div style="flex:1"></div>
+      <span id="last-updated"></span>
+      <div class="topbar-btn" onclick="refreshAll()"><span class="spin" id="refresh-spin" style="display:none">⟳</span> ⟳ Refresh</div>
+    </div>
+
+    <div id="content">
+
+      <!-- ══ OVERVIEW TAB ══ -->
+      <div class="tab-pane active" id="tab-overview">
+        <div class="grid-4" id="stat-cards">
+          <div class="card stat-card c-primary">
+            <div class="stat-icon">📋</div>
+            <div class="stat-value" id="s-total">—</div>
+            <div class="stat-label">Total Audit Logs</div>
+          </div>
+          <div class="card stat-card c-accent">
+            <div class="stat-icon">🗂️</div>
+            <div class="stat-value" id="s-entities">—</div>
+            <div class="stat-label">Entities Tracked</div>
+          </div>
+          <div class="card stat-card c-success">
+            <div class="stat-icon">⚡</div>
+            <div class="stat-value" id="s-today">—</div>
+            <div class="stat-label">Changes (24h)</div>
+          </div>
+          <div class="card stat-card c-info">
+            <div class="stat-icon">👤</div>
+            <div class="stat-value" id="s-actors">—</div>
+            <div class="stat-label">Unique Actors</div>
+          </div>
+        </div>
+
+        <div class="grid-2 mt-16">
+          <div class="card">
+            <div class="card-title">Activity — Last 14 Days</div>
+            <div style="position:relative;height:180px">
+              <canvas id="activity-chart"></canvas>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Entity Distribution</div>
+            <div class="entity-bar-wrap" id="entity-bars">
+              <div class="skeleton" style="height:14px;margin-bottom:8px"></div>
+              <div class="skeleton" style="height:14px;margin-bottom:8px"></div>
+              <div class="skeleton" style="height:14px"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title"><span>🕐</span> Recent Activity</div>
+        <div class="card">
+          <!-- Filter bar -->
+          <div class="filter-bar">
+            <select class="select-input" id="ov-entity" style="min-width:140px">
+              <option value="">All Entities</option>
+            </select>
+            <select class="select-input" id="ov-action" style="min-width:120px">
+              <option value="">All Actions</option>
+              <option value="CREATE">CREATE</option>
+              <option value="UPDATE">UPDATE</option>
+              <option value="DELETE">DELETE</option>
+            </select>
+            <input class="search-input" id="ov-actor" placeholder="Actor..." style="max-width:150px; flex:none;"/>
+            <input type="date" class="search-input" id="ov-from" style="max-width:140px; flex:none;" title="From date"/>
+            <span class="filter-sep">→</span>
+            <input type="date" class="search-input" id="ov-to" style="max-width:140px; flex:none;" title="To date"/>
+            <button class="btn" onclick="loadLogs(true)">Filter</button>
+            <button class="btn btn-danger" onclick="clearOvFilters()">Clear</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Entity</th><th>ID</th><th>Action</th>
+                <th>Changed By</th><th>When</th><th>Fields</th>
+              </tr></thead>
+              <tbody id="recent-tbody">
+                <tr><td colspan="6"><div class="skeleton" style="height:12px;margin:8px 0"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <!-- Pagination -->
+          <div class="pagination-bar" id="ov-pagination"></div>
+        </div>
+      </div>
+
+      <!-- ══ EXPLORER TAB ══ -->
+      <div class="tab-pane" id="tab-explorer">
+        <div class="card">
+          <div class="card-title">Search Audit Logs</div>
+          <div class="filter-bar">
+            <select class="select-input" id="exp-entity" onchange="onEntityChange()" style="min-width:150px">
+              <option value="">— All Entities —</option>
+            </select>
+            <input class="search-input" id="exp-id" placeholder="Entity ID (optional)" style="max-width:220px; flex:none;"/>
+            <select class="select-input" id="exp-action" style="min-width:120px">
+              <option value="">All Actions</option>
+              <option value="CREATE">CREATE</option>
+              <option value="UPDATE">UPDATE</option>
+              <option value="DELETE">DELETE</option>
+            </select>
+            <input class="search-input" id="exp-actor" placeholder="Actor (optional)" style="max-width:160px; flex:none;"/>
+            <input type="date" class="search-input" id="exp-from" style="max-width:140px; flex:none;" title="From date"/>
+            <span class="filter-sep">→</span>
+            <input type="date" class="search-input" id="exp-to" style="max-width:140px; flex:none;" title="To date"/>
+            <button class="btn" onclick="runExplorer(true)">Search</button>
+            <button class="btn btn-danger" onclick="clearExplorer()">Clear</button>
+          </div>
+          <div id="exp-timeline-wrap" style="display:none">
+            <div class="card-title" style="margin-top:16px" id="exp-timeline-title">History</div>
+            <div class="timeline" id="exp-timeline"></div>
+          </div>
+          <div class="table-wrap" id="exp-table-wrap" style="display:none">
+            <table>
+              <thead><tr>
+                <th>Entity</th><th>ID</th><th>Action</th>
+                <th>Changed By</th><th>When</th><th>Reason</th><th></th>
+              </tr></thead>
+              <tbody id="exp-tbody"></tbody>
+            </table>
+          </div>
+          <div class="empty-state" id="exp-empty">
+            <div class="icon">🔍</div>
+            <div>Set filters and press Search to explore audit history.</div>
+          </div>
+          <!-- Pagination -->
+          <div class="pagination-bar" id="exp-pagination"></div>
+        </div>
+      </div>
+
+      <!-- ══ CHAIN TAB ══ -->
+      <div class="tab-pane" id="tab-chain">
+        <div class="card">
+          <div class="card-title">Chain Integrity Verification</div>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:16px">
+            Verify the SHA-256 hash chain for any entity record. A broken chain indicates
+            that one or more audit entries were tampered with or deleted after the fact.
+          </p>
+          <div class="filter-bar">
+            <select class="select-input" id="chain-entity">
+              <option value="">— Select Entity —</option>
+            </select>
+            <input class="search-input" id="chain-id" placeholder="Entity ID (required)"/>
+            <button class="btn btn-success" onclick="verifyChain()">Verify Chain</button>
+          </div>
+          <div class="chain-result" id="chain-result">
+            <div class="chain-status" id="chain-status-text"></div>
+            <div id="chain-detail"></div>
+          </div>
+        </div>
+        <div class="card gap-top">
+          <div class="card-title">How chain hashing works</div>
+          <p style="color:var(--muted);font-size:13px;line-height:1.6">
+            Each audit entry stores a <code>prevHash</code> — the SHA-256 hash of the previous
+            entry's content. This creates a linked chain from the first to the latest change.
+            If any entry is modified or deleted, all subsequent hashes become invalid, making
+            tampering immediately detectable.<br/><br/>
+            Enable chain hashing in <code>application.properties</code>:
+          </p>
+          <pre style="margin-top:10px;background:var(--surface2);padding:12px;border-radius:8px;font-size:12px;color:var(--primary2);border:1px solid var(--border)">audit-trail.chain.enabled=true</pre>
+        </div>
+      </div>
+
+      <!-- ══ RECONSTRUCT TAB ══ -->
+      <div class="tab-pane" id="tab-reconstruct">
+        <div class="card">
+          <div class="card-title">Point-in-Time State Reconstruction</div>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:16px">
+            Replay the audit log to rebuild exactly what an entity looked like at any past moment.
+          </p>
+          <div class="filter-bar">
+            <select class="select-input" id="rec-entity">
+              <option value="">— Select Entity —</option>
+            </select>
+            <input class="search-input" id="rec-id" placeholder="Entity ID"/>
+            <input type="datetime-local" class="search-input" id="rec-at" style="min-width:190px"/>
+            <button class="btn btn-success" onclick="runReconstruct()">Reconstruct</button>
+          </div>
+          <div id="rec-result" style="margin-top:16px;display:none">
+            <div class="card-title">Reconstructed State</div>
+            <pre id="rec-output" style="background:var(--surface2);padding:16px;border-radius:8px;font-size:12px;color:var(--primary2);border:1px solid var(--border);overflow:auto;max-height:400px"></pre>
+          </div>
+          <div class="empty-state" id="rec-empty">
+            <div class="icon">⏪</div>
+            <div>Select an entity, provide an ID and a point in time, then press Reconstruct.</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<script>
+const BASE = '{{BASE_PATH}}';
+let activityChart = null;
+let autoRefreshTimer = null;
+let sidebarCollapsed = false;
+
+// ── Pagination state ──────────────────────────────────────────────────────────
+let overviewPage = 0;
+let overviewTotalPages = 0;
+let explorerPage = 0;
+let explorerTotalPages = 0;
+const PAGE_SIZE = 20;
+
+// ── Routing ───────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('nav-' + tab).classList.add('active');
+  const titles = { overview:'Overview', explorer:'Explorer', chain:'Chain Verify', reconstruct:'Reconstruct' };
+  document.getElementById('tab-title').textContent = titles[tab] || tab;
+  if (tab === 'overview')    loadOverview();
+  if (tab === 'explorer')    initExplorer();
+  if (tab === 'chain')       initChain();
+  if (tab === 'reconstruct') initReconstruct();
+}
+
+// ── Sidebar ───────────────────────────────────────────────────────────────────
+function toggleSidebar() {
+  sidebarCollapsed = !sidebarCollapsed;
+  document.getElementById('sidebar').classList.toggle('collapsed', sidebarCollapsed);
+  document.getElementById('collapse-icon').textContent = sidebarCollapsed ? '▶' : '◀';
+}
+
+// ── Auto-refresh ──────────────────────────────────────────────────────────────
+function toggleAutoRefresh() {
+  const on = document.getElementById('auto-refresh-toggle').checked;
+  if (on) { autoRefreshTimer = setInterval(refreshAll, 30000); toast('Auto-refresh on (30s)', 'info'); }
+  else    { clearInterval(autoRefreshTimer); autoRefreshTimer = null; toast('Auto-refresh off', 'info'); }
+}
+function refreshAll() {
+  const active = document.querySelector('.tab-pane.active')?.id?.replace('tab-','');
+  const spin = document.getElementById('refresh-spin');
+  spin.style.display = 'inline-block';
+  setTimeout(() => spin.style.display = 'none', 800);
+  if (active === 'overview') loadOverview();
+}
+
+// ── Overview ──────────────────────────────────────────────────────────────────
+async function loadOverview() {
+  const [stats, entities] = await Promise.all([
+    apiFetch(`${BASE}/dashboard/api/stats`),
+    apiFetch(`${BASE}/dashboard/api/entities`)
+  ]);
+  if (stats)    renderStats(stats);
+  if (entities) {
+    renderEntityBars(entities);
+    populateSelect('ov-entity', entities, 'All Entities');
+  }
+  await loadLogs(true);
+  document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+}
+
+// ── Filtered logs (Overview recent activity) ──────────────────────────────────
+async function loadLogs(reset = false) {
+  if (reset) overviewPage = 0;
+
+  const entity = document.getElementById('ov-entity')?.value || '';
+  const action = document.getElementById('ov-action')?.value || '';
+  const actor  = (document.getElementById('ov-actor')?.value || '').trim();
+  const from   = document.getElementById('ov-from')?.value || '';
+  const to     = document.getElementById('ov-to')?.value || '';
+
+  let url = `${BASE}/dashboard/api/logs?page=${overviewPage}&size=${PAGE_SIZE}`;
+  if (entity) url += `&entity=${encodeURIComponent(entity)}`;
+  if (action) url += `&action=${encodeURIComponent(action)}`;
+  if (actor)  url += `&actor=${encodeURIComponent(actor)}`;
+  if (from)   url += `&from=${encodeURIComponent(new Date(from).toISOString())}`;
+  if (to)     url += `&to=${encodeURIComponent(new Date(to + 'T23:59:59').toISOString())}`;
+
+  const data = await apiFetch(url);
+  if (!data) return;
+
+  overviewTotalPages = data.totalPages;
+  renderRecentTable(data.content);
+  renderPagination('ov-pagination', data.page, data.totalPages, data.totalElements, 'ov');
+}
+
+function clearOvFilters() {
+  ['ov-entity','ov-action'].forEach(id => document.getElementById(id).value = '');
+  ['ov-actor','ov-from','ov-to'].forEach(id => document.getElementById(id).value = '');
+  loadLogs(true);
+}
+
+// Pagination page-turn helpers called by the rendered HTML buttons
+function ovPrevPage() { if (overviewPage > 0) { overviewPage--; loadLogs(); } }
+function ovNextPage() { if (overviewPage < overviewTotalPages - 1) { overviewPage++; loadLogs(); } }
+function expPrevPage() { if (explorerPage > 0) { explorerPage--; runExplorer(); } }
+function expNextPage() { if (explorerPage < explorerTotalPages - 1) { explorerPage++; runExplorer(); } }
+
+function renderPagination(containerId, currentPage, totalPages, totalElements, prefix) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (totalPages <= 1 && totalElements <= PAGE_SIZE) {
+    el.innerHTML = totalElements > 0
+        ? `<span class="page-info">${totalElements.toLocaleString()} record${totalElements !== 1 ? 's' : ''}</span>`
+        : '';
+    return;
+  }
+  const start = totalElements === 0 ? 0 : currentPage * PAGE_SIZE + 1;
+  const end   = Math.min((currentPage + 1) * PAGE_SIZE, totalElements);
+  el.innerHTML = `
+    <button class="page-btn" onclick="${prefix}PrevPage()" ${currentPage === 0 ? 'disabled' : ''}>← Prev</button>
+    <span class="page-info">${start}–${end} of ${totalElements.toLocaleString()} records</span>
+    <span class="page-label">Page ${currentPage + 1} of ${totalPages}</span>
+    <button class="page-btn" onclick="${prefix}NextPage()" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>Next →</button>
+  `;
+}
+
+function renderStats(s) {
+  animateCount('s-total',    s.totalLogs);
+  animateCount('s-entities', s.uniqueEntities);
+  animateCount('s-today',    s.changesToday);
+  animateCount('s-actors',   s.uniqueActors);
+  renderActivityChart(s.activityByDay || {});
+}
+
+function animateCount(id, target) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const start = parseInt(el.textContent) || 0;
+  const dur = 600, steps = 30, step = (target - start) / steps;
+  let cur = start, i = 0;
+  const t = setInterval(() => {
+    cur += step; i++;
+    el.textContent = Math.round(i >= steps ? target : cur).toLocaleString();
+    if (i >= steps) clearInterval(t);
+  }, dur / steps);
+}
+
+function renderActivityChart(data) {
+  const labels = Object.keys(data).map(d => d.slice(5));
+  const values = Object.values(data);
+  const ctx = document.getElementById('activity-chart').getContext('2d');
+  if (activityChart) activityChart.destroy();
+  activityChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Changes',
+        data: values,
+        borderColor: '#6366f1',
+        backgroundColor: 'rgba(99,102,241,0.12)',
+        pointBackgroundColor: '#818cf8',
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        fill: true,
+        tension: 0.4,
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1e293b', borderColor: '#1e3a5f', borderWidth: 1, titleColor: '#e2e8f0', bodyColor: '#94a3b8' } },
+      scales: {
+        x: { grid: { color: 'rgba(30,58,95,.4)' }, ticks: { color: '#64748b', font: { size: 11 } } },
+        y: { grid: { color: 'rgba(30,58,95,.4)' }, ticks: { color: '#64748b', font: { size: 11 }, stepSize: 1 } }
+      }
+    }
+  });
+}
+
+function renderEntityBars(entities) {
+  const wrap = document.getElementById('entity-bars');
+  if (!entities.length) { wrap.innerHTML = '<div class="empty-state" style="padding:20px">No entities tracked yet.</div>'; return; }
+  const max = Math.max(...entities.map(e => e.count), 1);
+  wrap.innerHTML = entities.slice(0, 8).map(e => `
+    <div class="entity-row">
+      <div class="entity-name">${esc(e.name)}</div>
+      <div class="entity-bar-bg">
+        <div class="entity-bar-fill" style="width:${Math.round(e.count/max*100)}%"></div>
+      </div>
+      <div class="entity-count">${e.count.toLocaleString()}</div>
+    </div>`).join('');
+}
+
+function renderRecentTable(logs) {
+  const tbody = document.getElementById('recent-tbody');
+  if (!logs.length) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state" style="padding:20px">No matching audit logs.</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = logs.map(log => {
+    const diffs = parseDiffs(log.fieldDiffs);
+    return `
+    <tr class="clickable" onclick="toggleExpand(this, '${esc(JSON.stringify(log))}')">
+      <td><span class="chip">${esc(log.entityName)}</span></td>
+      <td class="mono">${esc(log.entityId)}</td>
+      <td><span class="action-badge action-${log.action}">${log.action}</span></td>
+      <td>${esc(log.changedBy)}</td>
+      <td class="mono" title="${esc(log.changedAt)}">${relativeTime(log.changedAt)}</td>
+      <td>${diffs.length ? `<span style="color:var(--muted);font-size:12px">${diffs.length} field${diffs.length>1?'s':''}</span>` : '—'}</td>
+    </tr>
+    <tr class="expand-row"><td colspan="6"><div class="expand-content hidden" id="expand-${esc(log.id)}"></div></td></tr>`;
+  }).join('');
+}
+
+function toggleExpand(row, logJson) {
+  const log = JSON.parse(logJson);
+  const expandRow = row.nextElementSibling;
+  const content = expandRow.querySelector('.expand-content');
+  if (!content.classList.contains('hidden')) { content.classList.add('hidden'); return; }
+  content.classList.remove('hidden');
+  content.innerHTML = buildExpandContent(log);
+}
+
+function buildExpandContent(log) {
+  const diffs = parseDiffs(log.fieldDiffs);
+  const diffHtml = diffs.length ? `
+    <div class="card-title" style="margin-bottom:8px">Field Changes</div>
+    <div class="diff-wrap">
+      ${diffs.map(d => `
+        <div>
+          <div class="diff-field">${esc(d.field)}</div>
+          <div class="diff-row">
+            <div><div class="diff-label">Before</div><div class="diff-old">${esc(d.oldValue ?? 'null')}</div></div>
+            <div><div class="diff-label">After</div><div class="diff-new">${esc(d.newValue ?? 'null')}</div></div>
+          </div>
+        </div>`).join('')}
+    </div>` : '<span style="color:var(--muted);font-size:12px">No field changes recorded.</span>';
+
+  return `
+    <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px">
+      ${log.whyReason    ? `<div><div class="diff-label">Reason</div><span style="color:var(--warning)">${esc(log.whyReason)}</span></div>` : ''}
+      ${log.masked       ? `<div><div class="diff-label">Masked</div><span class="chip">🔒 Sensitive</span></div>` : ''}
+      ${log.snapshotLabel? `<div><div class="diff-label">Snapshot</div><span class="chip">${esc(log.snapshotLabel)}</span></div>` : ''}
+      <div><div class="diff-label">Audit ID</div><span class="mono">${esc(log.id)}</span></div>
+      <div><div class="diff-label">Full Timestamp</div><span class="mono">${esc(log.changedAt)}</span></div>
+    </div>
+    ${diffHtml}`;
+}
+
+// ── Explorer ──────────────────────────────────────────────────────────────────
+async function initExplorer() {
+  const entities = await apiFetch(`${BASE}/dashboard/api/entities`) || [];
+  const sel = document.getElementById('exp-entity');
+  sel.innerHTML = '<option value="">— All Entities —</option>';
+  entities.forEach(e => sel.appendChild(new Option(`${e.name} (${e.count})`, e.name)));
+  // Also seed chain and reconstruct dropdowns while we have the data
+  populateSelect('chain-entity', entities, '— Select Entity —');
+  populateSelect('rec-entity',   entities, '— Select Entity —');
+  document.getElementById('exp-empty').style.display = 'block';
+  document.getElementById('exp-table-wrap').style.display = 'none';
+  document.getElementById('exp-timeline-wrap').style.display = 'none';
+}
+
+function onEntityChange() {
+  const id = document.getElementById('exp-entity').value;
+  document.getElementById('exp-id').placeholder = id ? 'Entity ID (optional)' : 'Entity ID (optional)';
+}
+
+async function runExplorer(resetPage = false) {
+  const entity = document.getElementById('exp-entity').value;
+  const id     = document.getElementById('exp-id').value.trim();
+  const action = document.getElementById('exp-action').value;
+  const actor  = document.getElementById('exp-actor').value.trim();
+  const from   = document.getElementById('exp-from').value;
+  const to     = document.getElementById('exp-to').value;
+
+  if (!entity && !id && !action && !actor && !from && !to) {
+    toast('Set at least one filter to search', 'error'); return;
+  }
+
+  if (resetPage) explorerPage = 0;
+  document.getElementById('exp-empty').style.display = 'none';
+
+  if (id && entity) {
+    // Specific record → timeline view (fetch up to 200, filter client-side by action/actor)
+    const url = `${BASE}/${encodeURIComponent(entity)}/${encodeURIComponent(id)}?size=200&sort=changedAt,asc`;
+    const data = await apiFetch(url);
+    let logs = data?.content || [];
+    if (actor)  logs = logs.filter(l => l.changedBy?.toLowerCase().includes(actor.toLowerCase()));
+    if (action) logs = logs.filter(l => l.action === action);
+
+    document.getElementById('exp-table-wrap').style.display = 'none';
+    document.getElementById('exp-timeline-wrap').style.display = 'block';
+    document.getElementById('exp-timeline-title').textContent =
+        `History: ${entity} #${id} (${logs.length} entr${logs.length !== 1 ? 'ies' : 'y'})`;
+    renderTimeline(logs);
+    document.getElementById('exp-pagination').innerHTML = '';
+  } else {
+    // Filtered table via dashboard API with server-side pagination
+    let url = `${BASE}/dashboard/api/logs?page=${explorerPage}&size=${PAGE_SIZE}`;
+    if (entity) url += `&entity=${encodeURIComponent(entity)}`;
+    if (id)     url += `&entityId=${encodeURIComponent(id)}`;
+    if (action) url += `&action=${encodeURIComponent(action)}`;
+    if (actor)  url += `&actor=${encodeURIComponent(actor)}`;
+    if (from)   url += `&from=${encodeURIComponent(new Date(from).toISOString())}`;
+    if (to)     url += `&to=${encodeURIComponent(new Date(to + 'T23:59:59').toISOString())}`;
+
+    const data = await apiFetch(url);
+    if (!data) return;
+
+    explorerTotalPages = data.totalPages;
+    document.getElementById('exp-timeline-wrap').style.display = 'none';
+    document.getElementById('exp-table-wrap').style.display = 'block';
+    renderExplorerTable(data.content);
+    renderPagination('exp-pagination', data.page, data.totalPages, data.totalElements, 'exp');
+  }
+}
+
+function renderTimeline(logs) {
+  const tl = document.getElementById('exp-timeline');
+  if (!logs.length) { tl.innerHTML = '<div class="empty-state">No entries found.</div>'; return; }
+  tl.innerHTML = logs.map((log, i) => {
+    const diffs = parseDiffs(log.fieldDiffs);
+    const isLast = i === logs.length - 1;
+    return `
+    <div class="tl-item">
+      <div class="tl-dot-wrap">
+        <div class="tl-dot ${log.action}"></div>
+        ${!isLast ? '<div class="tl-line"></div>' : ''}
+      </div>
+      <div class="tl-body">
+        <div class="tl-header">
+          <span class="tl-action">${log.action}</span>
+          <span class="tl-time">${relativeTime(log.changedAt)}</span>
+          <span class="tl-by">by ${esc(log.changedBy)}</span>
+          ${log.masked ? '<span class="chip">🔒</span>' : ''}
+        </div>
+        ${log.whyReason ? `<div style="font-size:12px;color:var(--warning);margin-bottom:6px">💬 ${esc(log.whyReason)}</div>` : ''}
+        ${diffs.length ? `<div class="diff-wrap">${diffs.map(d=>`
+          <div>
+            <div class="diff-field">${esc(d.field)}</div>
+            <div class="diff-row">
+              <div><div class="diff-label">Before</div><div class="diff-old">${esc(d.oldValue??'null')}</div></div>
+              <div><div class="diff-label">After</div><div class="diff-new">${esc(d.newValue??'null')}</div></div>
+            </div>
+          </div>`).join('')}</div>` : ''}
+        <div class="mono" style="margin-top:4px">${esc(log.id)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderExplorerTable(logs) {
+  const tbody = document.getElementById('exp-tbody');
+  if (!logs.length) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state" style="padding:20px">No results found.</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = logs.map(log => {
+    const diffs = parseDiffs(log.fieldDiffs);
+    return `
+    <tr class="clickable" onclick="toggleExpand(this, '${esc(JSON.stringify(log))}')">
+      <td><span class="chip">${esc(log.entityName)}</span></td>
+      <td class="mono">${esc(log.entityId)}</td>
+      <td><span class="action-badge action-${log.action}">${log.action}</span></td>
+      <td>${esc(log.changedBy)}</td>
+      <td class="mono">${relativeTime(log.changedAt)}</td>
+      <td style="color:var(--warning);font-size:12px">${log.whyReason ? esc(log.whyReason) : '—'}</td>
+      <td style="color:var(--muted);font-size:12px">${diffs.length} field${diffs.length!==1?'s':''}</td>
+    </tr>
+    <tr class="expand-row"><td colspan="7"><div class="expand-content hidden" id="expand-${esc(log.id)}"></div></td></tr>`;
+  }).join('');
+}
+
+function clearExplorer() {
+  ['exp-entity','exp-action'].forEach(id => document.getElementById(id).value = '');
+  ['exp-id','exp-actor','exp-from','exp-to'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('exp-tbody').innerHTML = '';
+  document.getElementById('exp-timeline-wrap').style.display = 'none';
+  document.getElementById('exp-table-wrap').style.display = 'none';
+  document.getElementById('exp-empty').style.display = 'block';
+  document.getElementById('exp-pagination').innerHTML = '';
+  explorerPage = 0;
+  explorerTotalPages = 0;
+}
+
+// ── Chain Verifier ────────────────────────────────────────────────────────────
+async function initChain() {
+  const entities = await apiFetch(`${BASE}/dashboard/api/entities`) || [];
+  populateSelect('chain-entity', entities, '— Select Entity —');
+}
+
+async function verifyChain() {
+  const entity = document.getElementById('chain-entity').value;
+  const id     = document.getElementById('chain-id').value.trim();
+  if (!entity || !id) { toast('Entity and ID are required', 'error'); return; }
+
+  const result = await apiFetch(`${BASE}/${encodeURIComponent(entity)}/${encodeURIComponent(id)}/verify`);
+  const box    = document.getElementById('chain-result');
+  const status = document.getElementById('chain-status-text');
+  const detail = document.getElementById('chain-detail');
+  box.style.display = 'block';
+
+  if (!result) {
+    box.className = 'chain-result broken';
+    status.className = 'chain-status chain-broken-text';
+    status.textContent = '✗ Request failed';
+    detail.textContent = 'Could not reach the verify endpoint.';
+    return;
+  }
+
+  if (result.valid) {
+    box.className = 'chain-result valid';
+    status.className = 'chain-status chain-valid-text';
+    status.textContent = '✓ Chain Intact';
+    detail.innerHTML = `<p style="color:var(--muted);font-size:13px">All hash links for <strong>${esc(entity)} #${esc(id)}</strong> are valid. No tampering detected.</p>`;
+    toast('Chain verified ✓', 'success');
+  } else {
+    box.className = 'chain-result broken';
+    status.className = 'chain-status chain-broken-text';
+    status.textContent = '✗ Chain Broken';
+    detail.innerHTML = `<p style="color:var(--muted);font-size:13px">Tampered entry detected in <strong>${esc(entity)} #${esc(id)}</strong>.</p>
+      ${result.brokenAtId ? `<div class="mono" style="margin-top:8px">Broken at: ${esc(result.brokenAtId)}</div>` : ''}`;
+    toast('Chain broken — tampering detected!', 'error');
+  }
+}
+
+// ── Reconstruct ───────────────────────────────────────────────────────────────
+async function initReconstruct() {
+  const entities = await apiFetch(`${BASE}/dashboard/api/entities`) || [];
+  populateSelect('rec-entity', entities, '— Select Entity —');
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  document.getElementById('rec-at').value = now.toISOString().slice(0, 16);
+}
+
+async function runReconstruct() {
+  const entity = document.getElementById('rec-entity').value;
+  const id     = document.getElementById('rec-id').value.trim();
+  const at     = document.getElementById('rec-at').value;
+  if (!entity || !id || !at) { toast('Entity, ID and date/time are required', 'error'); return; }
+
+  const iso = new Date(at).toISOString();
+  const result = await apiFetch(`${BASE}/${encodeURIComponent(entity)}/${encodeURIComponent(id)}/reconstruct?at=${encodeURIComponent(iso)}`);
+  const out   = document.getElementById('rec-output');
+  const box   = document.getElementById('rec-result');
+  const empty = document.getElementById('rec-empty');
+
+  if (!result) { toast('Reconstruction failed', 'error'); return; }
+  out.textContent = JSON.stringify(result, null, 2);
+  box.style.display = 'block';
+  empty.style.display = 'none';
+  toast('State reconstructed', 'success');
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+async function apiFetch(url) {
+  try {
+    const r = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!r.ok) { console.warn('API', url, r.status); return null; }
+    return await r.json();
+  } catch (e) { console.error('fetch', url, e); return null; }
+}
+
+function populateSelect(selectId, entities, placeholder) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = `<option value="">${placeholder}</option>`;
+  entities.forEach(e => sel.appendChild(new Option(e.name, e.name)));
+  if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+}
+
+function parseDiffs(raw) {
+  if (!raw) return [];
+  try { const d = JSON.parse(raw); return Array.isArray(d) ? d : []; }
+  catch { return []; }
+}
+
+function relativeTime(iso) {
+  if (!iso) return '—';
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 60000)   return 'just now';
+  if (diff < 3600000) return Math.floor(diff/60000) + 'm ago';
+  if (diff < 86400000) return Math.floor(diff/3600000) + 'h ago';
+  return Math.floor(diff/86400000) + 'd ago';
+}
+
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function toast(msg, type = 'info') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+loadOverview();
+</script>
+</body>
+</html>

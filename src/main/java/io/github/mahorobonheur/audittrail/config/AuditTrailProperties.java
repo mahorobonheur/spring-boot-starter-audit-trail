@@ -92,7 +92,7 @@ public class AuditTrailProperties {
     /** Anomaly detection configuration. */
     private Anomaly anomaly = new Anomaly();
 
-    /** Dashboard configuration (reserved for future use). */
+    /** Dashboard configuration. */
     private Dashboard dashboard = new Dashboard();
 
     // ── Nested config classes ─────────────────────────────────────────────────
@@ -160,11 +160,14 @@ public class AuditTrailProperties {
     }
 
     /**
-     * Configuration for the optional audit trail dashboard (reserved for future use).
+     * Configuration for the interactive audit trail dashboard UI.
+     *
+     * <p>Enable with {@code audit-trail.dashboard.enabled=true}.
+     * The dashboard is then served at {@code {rest.basePath}/dashboard}.
      */
     public static class Dashboard {
 
-        /** Whether the dashboard is enabled. Defaults to {@code false}. */
+        /** Whether the dashboard UI is enabled. Defaults to {@code false}. */
         private boolean enabled = false;
 
         public boolean isEnabled()        { return enabled; }

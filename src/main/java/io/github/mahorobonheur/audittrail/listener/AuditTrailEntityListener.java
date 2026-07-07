@@ -143,6 +143,26 @@ public class AuditTrailEntityListener {
 
     private String entityId(Object entity) {
         Class<?> entityClass = Hibernate.getClass(entity);
+
+        // Primary strategy: find any field annotated with @jakarta.persistence.Id,
+        // regardless of its name. Walks the full class hierarchy so entities that
+        // declare their @Id on a @MappedSuperclass are handled correctly.
+        Class<?> cursor = entityClass;
+        while (cursor != null && cursor != Object.class) {
+            for (java.lang.reflect.Field field : cursor.getDeclaredFields()) {
+                if (field.isAnnotationPresent(jakarta.persistence.Id.class)) {
+                    try {
+                        field.setAccessible(true);
+                        Object val = field.get(entity);
+                        return val != null ? val.toString() : "null";
+                    } catch (Exception ignored) { }
+                }
+            }
+            cursor = cursor.getSuperclass();
+        }
+
+        // Fallback: common field names for projects that don't use @Id or use
+        // a non-JPA persistence framework.
         for (String idField : new String[]{"id", "ID", "Id"}) {
             try {
                 var field = findField(entityClass, idField);
@@ -153,6 +173,9 @@ public class AuditTrailEntityListener {
                 }
             } catch (Exception ignored) { }
         }
+
+        log.warn("Could not determine entity ID for {}; falling back to identity hash. " +
+                 "Annotate your @Id field with @jakarta.persistence.Id.", entityClass.getSimpleName());
         return String.valueOf(System.identityHashCode(entity));
     }
 

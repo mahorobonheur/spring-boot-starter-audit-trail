@@ -115,7 +115,7 @@ public class DatabaseAuditLogWriter implements AuditLogWriter {
             String prevHash = null;
             if (chainService != null) {
                 Optional<AuditLog> last = repository
-                        .findTopByEntityNameAndEntityIdOrderByChangedAtDesc(
+                        .findTopByEntityNameAndEntityIdOrderByChangedAtDescIdDesc(
                                 request.getEntityName(), request.getEntityId());
                 if (last.isPresent()) {
                     prevHash = chainService.computeChainHash(last.get().getPrevHash(), last.get());

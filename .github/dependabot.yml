@@ -4,6 +4,7 @@ updates:
   # ── Maven dependencies ─────────────────────────────────────────────────────
   - package-ecosystem: maven
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly
       day: monday
@@ -48,13 +49,12 @@ updates:
   # ── GitHub Actions ──────────────────────────────────────────────────────────
   - package-ecosystem: github-actions
     directory: /
-    target-branch: "develop"
+    target-branch: develop
     schedule:
       interval: weekly
       day: monday
       time: "06:00"
       timezone: Africa/Kigali
-      target-branch: "develop"
     open-pull-requests-limit: 5
     labels:
       - dependencies
