@@ -57,7 +57,7 @@ public class AuditReconstructionService {
      */
     public Map<String, Object> reconstruct(String entityName, String entityId, Instant at) {
         List<AuditLog> entries = repository
-                .findByEntityNameAndEntityIdOrderByChangedAtAsc(entityName, entityId)
+                .findByEntityNameAndEntityIdOrderByChangedAtAscIdAsc(entityName, entityId)
                 .stream()
                 .filter(e -> !e.getChangedAt().isAfter(at))
                 .toList();

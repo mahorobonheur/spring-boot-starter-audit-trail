@@ -82,15 +82,21 @@ public class AuditChainService {
         for (AuditLog entry : entries) {
             String storedPrevHash = entry.getPrevHash();
 
-            // First entry: both stored and running hash should be null
-            if (runningHash == null && storedPrevHash == null) {
-                // Correct — first link in the chain
-            } else if (!java.util.Objects.equals(runningHash, storedPrevHash)) {
-                return new ChainVerificationResult(false, entry.getId());
+            if (storedPrevHash == null) {
+                // Anchor entry: either the very first entry ever, or an entry that was
+                // written before chain hashing was enabled (pre-chain entry).
+                // Reset the running hash from this entry's content so that the next
+                // chain-enabled entry can link to it correctly.
+                runningHash = computeChainHash(null, entry);
+            } else {
+                // Chain entry: stored prevHash must equal the running hash we computed
+                // from the previous entry. A mismatch means an entry was tampered with,
+                // inserted, or deleted between this entry and the previous anchor.
+                if (!java.util.Objects.equals(runningHash, storedPrevHash)) {
+                    return new ChainVerificationResult(false, entry.getId());
+                }
+                runningHash = computeChainHash(storedPrevHash, entry);
             }
-
-            // Advance the running hash: what the *next* entry's prevHash should be
-            runningHash = computeChainHash(storedPrevHash, entry);
         }
 
         return new ChainVerificationResult(true, null);
