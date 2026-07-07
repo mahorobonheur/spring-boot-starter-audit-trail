@@ -1,5 +1,6 @@
 package io.github.mahorobonheur.audittrail.engine;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.mahorobonheur.audittrail.annotation.AuditExclude;
 import io.github.mahorobonheur.audittrail.annotation.AuditMask;
 import io.github.mahorobonheur.audittrail.annotation.AuditTrail;
@@ -10,12 +11,14 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Compares two snapshots of the same entity and returns a {@link DiffResult}
@@ -37,6 +40,22 @@ import java.util.Set;
  * @author Bonheur Mahoro
  */
 public class FieldDiffEngine {
+
+    private final ObjectMapper objectMapper;
+
+    /** No-arg constructor kept for backward compatibility; Jackson serialization disabled. */
+    public FieldDiffEngine() {
+        this.objectMapper = null;
+    }
+
+    /**
+     * Preferred constructor — pass the application's {@link ObjectMapper} so that
+     * complex nested objects ({@code @Embeddable}, plain POJOs) are serialized to
+     * JSON rather than falling back to {@link Object#toString()}.
+     */
+    public FieldDiffEngine(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
 
     // ── DiffResult ────────────────────────────────────────────────────────────
 
@@ -227,8 +246,107 @@ public class FieldDiffEngine {
         }
     }
 
-    /** Converts a value to its string representation, or {@code null} if the value is {@code null}. */
+    /**
+     * Converts a value to a human-readable string for storage in field diffs.
+     *
+     * <p>Special handling (in order):
+     * <ol>
+     *   <li>Uninitialized Hibernate proxies/collections → {@code null} (avoids lazy-load outside session)</li>
+     *   <li>JPA {@code @Entity} objects → the entity's {@code @Id} value (e.g. {@code 3fa1b2c3-…})</li>
+     *   <li>Iterable/collection → {@code [id1, id2, …]} (IDs for entities, toString for primitives)</li>
+     *   <li>Simple types (String, Number, Boolean, Enum, Date, UUID, temporal) → {@code toString()}</li>
+     *   <li>Complex objects ({@code @Embeddable}, nested POJOs) → JSON via Jackson when available</li>
+     *   <li>Fallback → {@code toString()}</li>
+     * </ol>
+     */
     private String stringify(Object value) {
-        return (value == null) ? null : value.toString();
+        if (value == null) return null;
+        try {
+            // Don't trigger lazy loading for uninitialized proxies or collections
+            if (!Hibernate.isInitialized(value)) return null;
+
+            Class<?> realClass = Hibernate.getClass(value);
+
+            // JPA entity → extract the @Id value
+            if (realClass.isAnnotationPresent(jakarta.persistence.Entity.class)) {
+                String id = extractEntityId(value, realClass);
+                return id != null ? id : realClass.getSimpleName();
+            }
+
+            // Iterable (collections of entities or primitives)
+            if (value instanceof Iterable) {
+                List<String> items = new ArrayList<>();
+                for (Object item : (Iterable<?>) value) {
+                    if (item == null) { items.add("null"); continue; }
+                    try {
+                        Class<?> itemClass = Hibernate.getClass(item);
+                        if (itemClass.isAnnotationPresent(jakarta.persistence.Entity.class)) {
+                            String id = extractEntityId(item, itemClass);
+                            items.add(id != null ? id : itemClass.getSimpleName());
+                        } else {
+                            items.add(item.toString());
+                        }
+                    } catch (Exception ignored) {
+                        items.add(item.toString());
+                    }
+                }
+                return "[" + String.join(", ", items) + "]";
+            }
+
+            // Simple scalar types — toString() is always correct
+            if (isSimpleType(realClass)) {
+                return value.toString();
+            }
+
+            // Complex object (@Embeddable, nested POJO) — serialize to JSON
+            if (objectMapper != null) {
+                try {
+                    return objectMapper.writeValueAsString(value);
+                } catch (Exception ignored) {
+                    // Jackson can't serialize it (e.g. circular refs) — fall through
+                }
+            }
+        } catch (Exception ignored) {
+            // Safety net — fall through to plain toString()
+        }
+        return value.toString();
+    }
+
+    /**
+     * Returns {@code true} for types whose {@link Object#toString()} produces a
+     * meaningful, human-readable value: primitives, String, Number, Boolean,
+     * Enum, UUID, {@link Date}, and any {@link java.time.temporal.Temporal}.
+     */
+    private boolean isSimpleType(Class<?> clazz) {
+        return clazz.isPrimitive()
+                || clazz == String.class
+                || clazz == UUID.class
+                || clazz == Boolean.class
+                || clazz.isEnum()
+                || Number.class.isAssignableFrom(clazz)
+                || Date.class.isAssignableFrom(clazz)
+                || java.time.temporal.Temporal.class.isAssignableFrom(clazz);
+    }
+
+    /**
+     * Walks the class hierarchy to find a field annotated with
+     * {@link jakarta.persistence.Id} and returns its value as a String.
+     * Returns {@code null} if no {@code @Id} field is found or is inaccessible.
+     */
+    private String extractEntityId(Object entity, Class<?> entityClass) {
+        Class<?> cursor = entityClass;
+        while (cursor != null && cursor != Object.class) {
+            for (Field field : cursor.getDeclaredFields()) {
+                if (field.isAnnotationPresent(jakarta.persistence.Id.class)) {
+                    try {
+                        field.setAccessible(true);
+                        Object val = field.get(entity);
+                        return val != null ? val.toString() : null;
+                    } catch (Exception ignored) { }
+                }
+            }
+            cursor = cursor.getSuperclass();
+        }
+        return null;
     }
 }

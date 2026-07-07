@@ -5,6 +5,7 @@ import io.github.mahorobonheur.audittrail.actuator.AuditTrailActuatorEndpoint;
 import io.github.mahorobonheur.audittrail.anomaly.AuditAnomalyDetector;
 import io.github.mahorobonheur.audittrail.aspect.AuditWhyAspect;
 import io.github.mahorobonheur.audittrail.controller.AuditTrailController;
+import io.github.mahorobonheur.audittrail.controller.AuditTrailDashboardController;
 import io.github.mahorobonheur.audittrail.engine.FieldDiffEngine;
 import io.github.mahorobonheur.audittrail.listener.AuditTrailEntityListener;
 import io.github.mahorobonheur.audittrail.repository.AuditLogRepository;
@@ -61,12 +62,14 @@ public class AuditTrailAutoConfiguration {
     }
 
     /**
-     * The core diff engine. Stateless and thread-safe.
+     * The core diff engine. Receives the application {@link ObjectMapper} so that
+     * complex nested objects ({@code @Embeddable}, plain POJOs) are serialized to
+     * JSON rather than falling back to {@link Object#toString()}.
      */
     @Bean
     @ConditionalOnMissingBean
-    public FieldDiffEngine fieldDiffEngine() {
-        return new FieldDiffEngine();
+    public FieldDiffEngine fieldDiffEngine(ObjectMapper objectMapper) {
+        return new FieldDiffEngine(objectMapper);
     }
 
     /**
@@ -249,17 +252,28 @@ public class AuditTrailAutoConfiguration {
 
         @Bean
         @ConditionalOnMissingBean
+        @ConditionalOnProperty(prefix = "audit-trail.dashboard", name = "enabled", havingValue = "true")
+        public AuditTrailDashboardController auditTrailDashboardController(
+                AuditLogRepository repository,
+                AuditTrailProperties properties) {
+            return new AuditTrailDashboardController(repository, properties.getRest().getBasePath());
+        }
+
+        @Bean
+        @ConditionalOnMissingBean
         public AuditTrailController auditTrailController(AuditLogRepository repository,
                                                           AuditTrailProperties properties,
                                                           ObjectProvider<AuditChainService> chainService,
-                                                          AuditReconstructionService reconstructionService) {
+                                                          AuditReconstructionService reconstructionService,
+                                                          ObjectMapper objectMapper) {
             return new AuditTrailController(
                     repository,
                     properties,
                     chainService.getIfAvailable() != null
                             ? java.util.Optional.of(chainService.getIfAvailable())
                             : java.util.Optional.empty(),
-                    reconstructionService);
+                    reconstructionService,
+                    objectMapper);
         }
     }
 }

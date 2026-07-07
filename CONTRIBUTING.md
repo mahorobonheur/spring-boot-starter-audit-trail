@@ -83,7 +83,7 @@ src/
 │   ├── aspect/        AuditWhyAspect — AOP aspect for @AuditWhy parameter interception
 │   ├── config/        AuditTrailAutoConfiguration, AuditTrailProperties
 │   ├── context/       AuditWhyContext — ThreadLocal business reason holder
-│   ├── controller/    AuditTrailController — REST endpoints
+│   ├── controller/    AuditTrailController, AuditTrailDashboardController — REST + dashboard
 │   ├── engine/        FieldDiffEngine — core field-level diff logic
 │   ├── listener/      AuditTrailEntityListener — Hibernate SPI integration
 │   ├── model/         AuditLog, AuditAction, FieldDiff, AuditWriteRequest
@@ -94,12 +94,22 @@ src/
 │                      LogAuditLogWriter
 ├── main/resources/
 │   └── META-INF/spring/   AutoConfiguration.imports (starter registration)
+│   └── audit-trail/       dashboard.html (dashboard UI template)
 └── test/java/
-    ├── annotation/        AuditTrailAnnotationTest
-    ├── engine/            FieldDiffEngineTest (unit tests)
-    ├── integration/       AuditTrailIntegrationTest, AuditTrailPostgresIntegrationTest
-    ├── security/          AuditSecurityResolverTest
-    └── writer/            DatabaseAuditLogWriterTest, LogAuditLogWriterTest
+    ├── annotation/          AuditTrailAnnotationTest
+    ├── actuator/          AuditTrailActuatorEndpointTest
+    ├── anomaly/           AuditAnomalyDetectorTest
+    ├── aspect/              AuditWhyAspectTest
+    ├── context/             AuditWhyContextTest
+    ├── controller/          AuditTrailControllerTest, AuditTrailDashboardControllerTest
+    ├── engine/              FieldDiffEngineTest (unit tests)
+    ├── integration/         AuditTrailIntegrationTest, AuditTrailChainIntegrationTest,
+    │                        AuditTrailPostgresIntegrationTest (requires Docker)
+    ├── security/            AuditSecurityResolverTest
+    ├── service/             AuditChainServiceTest, AuditReconstructionServiceTest,
+    │                        AuditSnapshotServiceTest
+    └── writer/              DatabaseAuditLogWriterTest, LogAuditLogWriterTest,
+                             AsyncAuditLogWriterTest
 ```
 
 ---
@@ -198,7 +208,7 @@ chore(deps): bump spring-boot from 3.3.0 to 3.4.0
 
 - **Unit tests** go alongside the class being tested (e.g. `engine/`, `writer/`).
 - **Integration tests** go in `integration/` and use Spring Boot Test with H2.
-- **Coverage:** Test coverage must remain above **80%** (enforced by JaCoCo in CI).
+- **Coverage:** Line coverage must remain at or above **80%** (enforced by JaCoCo `check` during `mvn verify`).
 - **Test naming:** Use `@DisplayName` with a plain English description of the scenario.
 - **Assertions:** Use [AssertJ](https://assertj.github.io/doc/) — it produces clearer failure messages than JUnit assertions.
 - **Async behaviour:** Use [Awaitility](http://www.awaitility.org/) for tests involving async audit writes.

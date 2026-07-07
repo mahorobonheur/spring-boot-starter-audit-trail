@@ -9,7 +9,7 @@
     <!--Coordinates -->
     <groupId>io.github.mahorobonheur</groupId>
     <artifactId>mahoro-audit-trail</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <!--  Project metadata -->
@@ -133,11 +133,12 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- Jackson (JSON serialisation of field diffs) -->
+        <!-- Jackson 2 (used internally for field-diff serialisation) -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>
+
 
         <!-- Test dependencies  -->
         <dependency>
@@ -262,7 +263,7 @@
                 </configuration>
             </plugin>
 
-            <!-- JaCoCo — enforce 80 % coverage -->
+            <!-- JaCoCo — coverage report + 80 % line threshold -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
@@ -279,6 +280,35 @@
                         <goals>
                             <goal>report</goal>
                         </goals>
+                    </execution>
+                    <execution>
+                        <id>check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.80</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                            <excludes>
+                                <exclude>io/github/mahorobonheur/audittrail/config/AuditTrailAutoConfiguration.class</exclude>
+                                <exclude>io/github/mahorobonheur/audittrail/config/AuditTrailHibernateIntegrator.class</exclude>
+                                <exclude>io/github/mahorobonheur/audittrail/config/AuditTrailMappingContributor.class</exclude>
+                                <exclude>io/github/mahorobonheur/audittrail/config/AuditTrailTableNamingStrategy.class</exclude>
+                                <exclude>io/github/mahorobonheur/audittrail/config/SpringContextHolder.class</exclude>
+                                <exclude>io/github/mahorobonheur/audittrail/listener/AuditTrailEntityListener.class</exclude>
+                            </excludes>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -326,7 +356,6 @@
                         <configuration>
                             <!-- Matches server-id configured in settings.xml by actions/setup-java -->
                             <publishingServerId>central</publishingServerId>
-                            <tokenAuth>true</tokenAuth>
                             <autoPublish>true</autoPublish>
                             <waitUntil>published</waitUntil>
                             <deploymentName>mahoro-audit-trail</deploymentName>

@@ -1,5 +1,6 @@
 package io.github.mahorobonheur.audittrail.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.mahorobonheur.audittrail.config.AuditTrailProperties;
 import io.github.mahorobonheur.audittrail.model.AuditLog;
 import io.github.mahorobonheur.audittrail.repository.AuditLogRepository;
@@ -56,42 +57,82 @@ public class AuditTrailController {
     private final AuditTrailProperties        properties;
     private final Optional<AuditChainService> chainService;
     private final AuditReconstructionService  reconstructionService;
+    private final ObjectMapper                objectMapper;
 
     public AuditTrailController(AuditLogRepository repository,
                                  AuditTrailProperties properties,
                                  Optional<AuditChainService> chainService,
-                                 AuditReconstructionService reconstructionService) {
+                                 AuditReconstructionService reconstructionService,
+                                 ObjectMapper objectMapper) {
         this.repository            = repository;
         this.properties            = properties;
         this.chainService          = chainService;
         this.reconstructionService = reconstructionService;
+        this.objectMapper          = objectMapper;
+    }
+
+    /**
+     * Converts an {@link AuditLog} entity to a plain {@code Map} suitable for
+     * JSON serialization by any Jackson version.  The {@code fieldDiffs} string
+     * (which is a stored JSON array) is parsed back to a {@code List} so it
+     * serializes as a proper JSON array rather than an escaped string.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> toResponse(AuditLog entry) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id",            entry.getId());
+        m.put("entityName",    entry.getEntityName());
+        m.put("entityId",      entry.getEntityId());
+        m.put("action",        entry.getAction());
+        m.put("changedBy",     entry.getChangedBy());
+        m.put("changedAt",     entry.getChangedAt());
+        m.put("masked",        entry.isMasked());
+        m.put("whyReason",     entry.getWhyReason());
+        m.put("snapshotLabel", entry.getSnapshotLabel());
+        m.put("prevHash",      entry.getPrevHash());
+        try {
+            m.put("fieldDiffs", objectMapper.readValue(entry.getFieldDiffs(), List.class));
+        } catch (Exception ignored) {
+            m.put("fieldDiffs", entry.getFieldDiffs());
+        }
+        return m;
     }
 
     /**
      * Returns the paginated audit history for a specific entity record.
+     * Both trailing-slash and non-trailing-slash forms are accepted because
+     * Spring 6+ no longer matches them interchangeably by default.
      */
-    @GetMapping("/{entityName}/{entityId}")
-    public ResponseEntity<Page<AuditLog>> getHistory(
+    @GetMapping({"/{entityName}/{entityId}", "/{entityName}/{entityId}/"})
+    public ResponseEntity<Page<Map<String, Object>>> getHistory(
             @PathVariable String entityName,
             @PathVariable String entityId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by("changedAt").descending());
-        return ResponseEntity.ok(repository.findByEntityNameAndEntityId(entityName, entityId, pageable));
+        return ResponseEntity.ok(
+                repository.findByEntityNameAndEntityId(entityName, entityId, pageable)
+                          .map(this::toResponse));
     }
 
     /**
      * Returns the paginated audit history for all records of a given entity type.
      */
-    @GetMapping("/{entityName}")
-    public ResponseEntity<Page<AuditLog>> getHistoryByEntity(
+    @GetMapping({"/{entityName}", "/{entityName}/"})
+    public ResponseEntity<Page<Map<String, Object>>> getHistoryByEntity(
             @PathVariable String entityName,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
+        // "dashboard" is a reserved path segment — return 404 when the dashboard is disabled
+        if ("dashboard".equalsIgnoreCase(entityName)) {
+            return ResponseEntity.notFound().build();
+        }
         Pageable pageable = PageRequest.of(page, size, Sort.by("changedAt").descending());
-        return ResponseEntity.ok(repository.findByEntityName(entityName, pageable));
+        return ResponseEntity.ok(
+                repository.findByEntityName(entityName, pageable)
+                          .map(this::toResponse));
     }
 
     /**
@@ -121,8 +162,8 @@ public class AuditTrailController {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("entityName", entityName);
         result.put("entityId",   entityId);
-        result.put("from",       fromEntry.get());
-        result.put("to",         toEntry.get());
+        result.put("from",       toResponse(fromEntry.get()));
+        result.put("to",         toResponse(toEntry.get()));
         return ResponseEntity.ok(result);
     }
 
@@ -146,7 +187,7 @@ public class AuditTrailController {
         }
 
         List<AuditLog> entries = repository
-                .findByEntityNameAndEntityIdOrderByChangedAtAsc(entityName, entityId);
+                .findByEntityNameAndEntityIdOrderByChangedAtAscIdAsc(entityName, entityId);
 
         AuditChainService.ChainVerificationResult result = chainService.get().verifyChain(entries);
 
