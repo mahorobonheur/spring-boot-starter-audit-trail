@@ -700,7 +700,7 @@ Found a security issue? Please read [SECURITY.md](SECURITY.md) and report it pri
 ## Author
 
 **Bonheur Mahoro**  
-[bonheur.mahoro@amalitechtraining.org](mailto:bonheur.mahoro@amalitechtraining.org)  
+[mahorobonheur123@gmail.com](mailto:mahorobonheur123@gmail.com)  
 [github.com/mahorobonheur](https://github.com/mahorobonheur)
 
 ---
